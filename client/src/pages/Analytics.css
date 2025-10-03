@@ -1,0 +1,26 @@
+/* Modern Analytics page styles */
+.analytics-container {
+  padding-top: 8px;
+}
+
+.analytics-container .card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.analytics-container h1 {
+  font-weight: 700;
+}
+
+/* Time range buttons */
+.analytics-container .btn-group .btn {
+  border-radius: 999px;
+}
+
+/* Chart cards */
+.analytics-container .card-header {
+  background: transparent;
+  border-bottom: 1px dashed var(--border);
+}

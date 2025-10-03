@@ -1,0 +1,644 @@
+openapi: 3.0.0
+info:
+  title: Faculty Reporting System API
+  version: 1.0.0
+  description: API documentation for the Faculty Reporting System (backend in Express.js)
+
+servers:
+  - url: http://localhost:5003/api
+    description: Local development server (client .env default)
+  - url: http://localhost:5000/api
+    description: Local development server (server default)
+  - url: http://localhost:5001/api
+    description: Local development server (alternate)
+
+security:
+  - BearerAuth: []
+
+paths:
+  /auth/register:
+    post:
+      summary: Register a new user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+
+  /auth/login:
+    post:
+      summary: User login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+
+  /auth/me:
+    get:
+      summary: Get current user profile
+      responses:
+        '200':
+          description: User profile returned
+
+  /auth/change-password:
+    post:
+      summary: Change password
+      responses:
+        '200':
+          description: Password changed
+
+  /auth/logout:
+    post:
+      summary: Logout user
+      responses:
+        '200':
+          description: User logged out
+
+  /auth/verify-token:
+    get:
+      summary: Verify authentication token
+      responses:
+        '200':
+          description: Token valid
+
+  /dashboard/public:
+    get:
+      summary: Get public dashboard data
+      security: []
+      responses:
+        '200':
+          description: Dashboard data
+
+  /dashboard/personal:
+    get:
+      summary: Get personal dashboard data
+      responses:
+        '200':
+          description: Dashboard data
+
+  /dashboard/analytics:
+    get:
+      summary: Get analytics
+      responses:
+        '200':
+          description: Analytics returned
+
+  /dashboard/notifications:
+    get:
+      summary: Get notifications
+      responses:
+        '200':
+          description: Notifications list
+
+  /export/reports/excel:
+    get:
+      summary: Export reports as Excel
+      responses:
+        '200':
+          description: File download
+
+  /export/reports/pdf:
+    get:
+      summary: Export reports as PDF
+      responses:
+        '200':
+          description: File download
+
+  /export/analytics/excel:
+    get:
+      summary: Export analytics as Excel
+      responses:
+        '200':
+          description: File download
+
+  /reports:
+    get:
+      summary: Get all reports
+      responses:
+        '200':
+          description: List of reports
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reports:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Report'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+    post:
+      summary: Create a report
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportCreateRequest'
+      responses:
+        '201':
+          description: Report created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  report:
+                    $ref: '#/components/schemas/Report'
+
+  /reports/{id}:
+    get:
+      summary: Get report by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Report data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  report:
+                    $ref: '#/components/schemas/Report'
+                  feedback:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Feedback'
+    put:
+      summary: Update report by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportUpdateRequest'
+      responses:
+        '200':
+          description: Report updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  report:
+                    $ref: '#/components/schemas/Report'
+    delete:
+      summary: Delete report by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Report deleted
+
+  /reports/{id}/feedback:
+    post:
+      summary: Add feedback to report
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackCreateRequest'
+      responses:
+        '201':
+          description: Feedback added
+
+  /reports/stats/summary:
+    get:
+      summary: Get reports summary
+      responses:
+        '200':
+          description: Summary returned
+
+  /users/public-test:
+    get:
+      summary: Public test endpoint
+      security: []
+      responses:
+        '200':
+          description: Test ok
+
+  /users:
+    get:
+      summary: Get all users
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+    post:
+      summary: Create a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreateRequest'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+
+  /users/{id}:
+    get:
+      summary: Get user by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: User not found
+    put:
+      summary: Update user by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdateRequest'
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+    delete:
+      summary: Delete user by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User deleted
+
+  /users/{id}/deactivate:
+    post:
+      summary: Deactivate user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User deactivated
+
+  /users/{id}/reactivate:
+    post:
+      summary: Reactivate user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User reactivated
+
+  /users/courses/available:
+    get:
+      summary: Get available courses
+      responses:
+        '200':
+          description: Courses list
+
+  /users/{id}/enroll:
+    post:
+      summary: Enroll user in course
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                courseId:
+                  type: integer
+                academicYear:
+                  type: string
+                semester:
+                  type: integer
+      responses:
+        '200':
+          description: User enrolled
+
+  /users/{id}/assign-course:
+    post:
+      summary: Assign course to user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                courseId:
+                  type: integer
+                academicYear:
+                  type: string
+                semester:
+                  type: integer
+      responses:
+        '200':
+          description: Course assigned
+
+  /users/streams/list:
+    get:
+      summary: Get streams list
+      responses:
+        '200':
+          description: Streams list
+
+  /users/rate-class:
+    post:
+      summary: Rate a class
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                courseId:
+                  type: integer
+                lecturerId:
+                  type: integer
+                rating:
+                  type: integer
+                comments:
+                  type: string
+                classDate:
+                  type: string
+                  format: date
+      responses:
+        '200':
+          description: Class rated
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+    LoginResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+        token:
+          type: string
+    RegisterRequest:
+      type: object
+      required: [username, email, password, firstName, lastName, role]
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        role:
+          type: string
+          enum: [student, lecturer, program_leader, principal_lecturer, faculty_manager]
+        phone:
+          type: string
+    RegisterResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+        token:
+          type: string
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        phone:
+          type: string
+        is_active:
+          type: boolean
+    UserCreateRequest:
+      type: object
+      required: [username, email, password]
+      properties:
+        username: { type: string }
+        email: { type: string, format: email }
+        password: { type: string }
+        firstName: { type: string }
+        lastName: { type: string }
+        role:
+          type: string
+          enum: [student, lecturer, program_leader, principal_lecturer, faculty_manager, admin]
+        phone: { type: string }
+    UserUpdateRequest:
+      type: object
+      properties:
+        firstName: { type: string }
+        lastName: { type: string }
+        role:
+          type: string
+          enum: [student, lecturer, program_leader, principal_lecturer, faculty_manager, admin]
+        phone: { type: string }
+        is_active: { type: boolean }
+    Report:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        content: { type: string }
+        report_type: { type: string }
+        status: { type: string }
+        rating: { type: integer, nullable: true }
+        attendance_count: { type: integer, nullable: true }
+        topic_covered: { type: string, nullable: true }
+        learning_outcomes: { type: string, nullable: true }
+        challenges: { type: string, nullable: true }
+        recommendations: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        reporter_role: { type: string, nullable: true }
+        course_name: { type: string, nullable: true }
+        course_code: { type: string, nullable: true }
+    ReportCreateRequest:
+      type: object
+      required: [title, content, reportType]
+      properties:
+        title: { type: string }
+        content: { type: string }
+        reportType: { type: string }
+        courseId: { type: integer, nullable: true }
+        attendanceCount: { type: integer, nullable: true }
+        topicCovered: { type: string, nullable: true }
+        learningOutcomes: { type: string, nullable: true }
+        challenges: { type: string, nullable: true }
+        recommendations: { type: string, nullable: true }
+        rating: { type: integer, nullable: true }
+    ReportUpdateRequest:
+      allOf:
+        - $ref: '#/components/schemas/ReportCreateRequest'
+    Feedback:
+      type: object
+      properties:
+        id: { type: integer }
+        report_id: { type: integer }
+        feedback_from_id: { type: integer }
+        feedback_to_id: { type: integer }
+        feedback_content: { type: string }
+        feedback_type: { type: string }
+        created_at: { type: string, format: date-time }
+    FeedbackCreateRequest:
+      type: object
+      required: [content, feedbackType]
+      properties:
+        content: { type: string }
+        feedbackType: { type: string, enum: [approval, rejection, suggestion, clarification] }
+    Pagination:
+      type: object
+      properties:
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+        pages: { type: integer }
+
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: System healthy
+
+  /db-test:
+    get:
+      summary: Database connection test
+      responses:
+        '200':
+          description: DB connection ok

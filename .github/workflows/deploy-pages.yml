@@ -38,6 +38,9 @@ jobs:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
         run: npm run build
 
+      - name: Add CNAME for custom domain
+        run: echo "mainproject.com" > client/build/CNAME
+
       - name: Add SPA fallback (404.html)
         run: cp client/build/index.html client/build/404.html
 

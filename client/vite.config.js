@@ -3,9 +3,8 @@ import react from '@vitejs/plugin-react';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  // Base path for GitHub Pages project site: https://<user>.github.io/faculty-reporting-system/
-  // Ensures assets resolve from /faculty-reporting-system/
-  base: '/faculty-reporting-system/',
+  // Base path for custom domain deployment (served at domain root)
+  base: '/',
   server: {
     host: '0.0.0.0',
     port: 5173,

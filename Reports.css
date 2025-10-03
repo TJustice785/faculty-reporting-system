@@ -1,0 +1,48 @@
+.reports-container {
+  padding-top: 8px;
+}
+
+.reports-container h2 {
+  font-weight: 700;
+}
+
+.reports-container .card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+/* Filters card */
+.reports-container .card .form-select,
+.reports-container .card .form-control {
+  border-radius: var(--radius-sm);
+}
+
+/* Table styling */
+.reports-container table thead th {
+  border-top: 0;
+  border-bottom: 1px dashed var(--border) !important;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.reports-container table tbody td {
+  vertical-align: middle;
+}
+
+.reports-container .table-hover tbody tr:hover {
+  background: rgba(13,110,253,0.04);
+}
+
+/* Empty state */
+.reports-container .display-1 { opacity: .6; }
+
+/* Badges */
+.reports-container .badge { letter-spacing: .2px; }
+
+/* Actions */
+.reports-container .btn-outline-primary, 
+.reports-container .btn-outline-secondary {
+  border-radius: 8px;
+}

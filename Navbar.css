@@ -1,0 +1,64 @@
+.brand-text { letter-spacing: .3px; }
+
+/* Modern translucent navbar */
+.custom-navbar.navbar {
+  background: rgba(15, 23, 42, 0.75); /* slate-900 with transparency */
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  -webkit-backdrop-filter: saturate(140%) blur(10px);
+  backdrop-filter: saturate(140%) blur(10px);
+}
+
+.custom-navbar .navbar-brand .brand-text {
+  font-weight: 600;
+  letter-spacing: .2px;
+}
+
+.custom-navbar .nav-link {
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  color: rgba(255,255,255,0.85);
+  transition: color .2s ease, background-color .2s ease;
+}
+
+.custom-navbar .nav-link:hover {
+  color: #fff;
+  background: rgba(255,255,255,0.06);
+}
+
+.custom-navbar .nav-link.active {
+  color: #fff !important;
+  background: linear-gradient(180deg, rgba(13,110,253,0.25), rgba(13,110,253,0.15));
+  border: 1px solid rgba(13,110,253,0.35);
+}
+
+.custom-navbar .dropdown-menu {
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(15, 23, 42, 0.98);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 30px rgba(0,0,0,.35);
+}
+
+.custom-navbar .dropdown-item {
+  color: rgba(255,255,255,0.9);
+}
+.custom-navbar .dropdown-item:hover,
+.custom-navbar .dropdown-item:focus {
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+}
+
+/* Logo in navbar */
+.custom-navbar .navbar-logo {
+  display: inline-block;
+  background: rgba(255,255,255,0.15);
+  padding: 2px;
+  border-radius: 9999px; /* full */
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+}
+
+/* Slight adjust when brand collapses */
+@media (max-width: 991.98px) {
+  .custom-navbar .navbar-brand .navbar-logo { margin-right: 2px; }
+}

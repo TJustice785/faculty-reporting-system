@@ -1,0 +1,55 @@
+.auth-container {
+  min-height: calc(100vh - 120px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+}
+
+.auth-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  width: 100%;
+  max-width: 560px;
+}
+
+.auth-title {
+  background: linear-gradient(135deg, var(--brand), #6f42c1);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: anywhere;
+  writing-mode: horizontal-tb;
+  line-height: 1.15;
+}
+
+.auth-card .form-control:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 0.2rem rgba(13,110,253,0.15);
+}
+
+.auth-card .btn-primary {
+  box-shadow: 0 10px 24px rgba(13,110,253,.15);
+}
+
+/* Auth logo styles */
+.auth-logo {
+  background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.7));
+  padding: 6px;
+  border-radius: 9999px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+}
+
+[data-theme='dark'] .auth-logo {
+  background: linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.25));
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+}
+
+/* Reduce inner padding on very small screens */
+@media (max-width: 420px) {
+  .auth-card .p-5 { padding: 1.5rem !important; }
+}

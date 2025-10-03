@@ -1,0 +1,88 @@
+.spinner-wrap { min-height: 40vh; display: flex; align-items: center; justify-content: center; }
+
+/* Theme variables for better contrast */
+html[data-theme='light'] {
+  color-scheme: light;
+  --bs-body-bg: #ffffff;
+  --bs-body-color: #212529;
+  --bs-card-bg: #ffffff;
+  --bs-card-color: #212529;
+  --bs-border-color: #dee2e6;
+  --bs-link-color: #0d6efd;
+  --bs-link-hover-color: #0a58ca;
+}
+
+html[data-theme='dark'] {
+  color-scheme: dark;
+  --bs-body-bg: #121212;
+  --bs-body-color: #e6e6e6;
+  --bs-card-bg: #1e1e1e;
+  --bs-card-color: #e6e6e6;
+  --bs-border-color: #2a2a2a;
+  --bs-link-color: #66b2ff;
+  --bs-link-hover-color: #99ccff;
+}
+
+/* Apply variables to body and cards */
+body { background-color: var(--bs-body-bg); color: var(--bs-body-color); }
+.card { background-color: var(--bs-card-bg); color: var(--bs-card-color); border-color: var(--bs-border-color); }
+.card .card-header { border-bottom-color: var(--bs-border-color); }
+
+/* Links */
+a { color: var(--bs-link-color); }
+a:hover { color: var(--bs-link-hover-color); }
+
+/* Badges with low-contrast backgrounds in dark mode */
+html[data-theme='dark'] .badge.bg-warning { color: #212529; }
+html[data-theme='dark'] .badge.bg-info { color: #212529; }
+
+/* App container */
+.App {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Main content area below navbar */
+.main-content {
+  flex: 1 1 auto;
+  padding: 24px;
+}
+
+@media (min-width: 768px) {
+  .main-content { padding: 32px; }
+}
+
+/* Mobile tweaks */
+@media (max-width: 576px) {
+  .main-content { padding: 12px; }
+  .dashboard-container .card { margin-bottom: 12px; }
+  .quick-tiles .tile { width: 100%; }
+}
+
+@media (min-width: 577px) and (max-width: 768px) {
+  .main-content { padding: 16px; }
+}
+
+/* Section wrappers */
+.section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+}
+
+.section + .section { margin-top: 20px; }
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.section-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+}

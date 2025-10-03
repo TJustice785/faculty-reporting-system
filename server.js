@@ -72,26 +72,38 @@ console.log(`   Host: ${dbConfig.host}:${dbConfig.port}`);
 console.log(`   Database: ${dbConfig.database}`);
 console.log(`   User: ${dbConfig.user}`);
 
-// Utility to convert '?' placeholders to $1, $2 ... for Postgres
 function toPostgresPlaceholders(sql) {
   let idx = 0;
   return sql.replace(/\?/g, () => `$${++idx}`);
 }
 
-// Initialize PostgreSQL pool and a unified adapter
-let pool;
-let db;
+  // Initialize PostgreSQL pool and a unified adapter
+  let pool;
+  let db;
 
-pool = new PgPool({
-  host: dbConfig.host,
-  port: dbConfig.port,
-  user: dbConfig.user,
-  password: dbConfig.password,
-  database: dbConfig.database,
-  max: dbConfig.connectionLimit || 10,
-  idleTimeoutMillis: 60000,
-  connectionTimeoutMillis: 60000,
-});
+  // Prefer DATABASE_URL if provided by the hosting platform; otherwise use discrete vars
+  if (process.env.DATABASE_URL) {
+    console.log('🔗 Using DATABASE_URL for Postgres connection');
+    pool = new PgPool({
+      connectionString: process.env.DATABASE_URL,
+      // Render/Railway often require SSL; disable cert verification for managed instances
+      ssl: { rejectUnauthorized: false },
+      max: dbConfig.connectionLimit || 10,
+      idleTimeoutMillis: 60000,
+      connectionTimeoutMillis: 60000,
+    });
+  } else {
+    pool = new PgPool({
+      host: dbConfig.host,
+      port: dbConfig.port,
+      user: dbConfig.user,
+      password: dbConfig.password,
+      database: dbConfig.database,
+      max: dbConfig.connectionLimit || 10,
+      idleTimeoutMillis: 60000,
+      connectionTimeoutMillis: 60000,
+    });
+  }
 
 db = {
   async execute(sql, params = []) {

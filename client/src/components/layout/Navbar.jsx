@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Navbar as BootstrapNavbar, Nav, NavDropdown, Container, Badge } from 'react-bootstrap';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { useQuery } from 'react-query';
+import { useQuery, useQueryClient } from 'react-query';
 import { apiService } from '../../services/api';
 import './Navbar.css';
 import Logo from '../common/Logo.jsx';
@@ -13,6 +13,7 @@ const Navbar = () => {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
   const [theme, setTheme] = useState('');
+  const queryClient = useQueryClient();
 
   // Theme initialization and persistence
   useEffect(() => {
@@ -75,6 +76,21 @@ const Navbar = () => {
 
   const unreadCount = notifCountData?.unread || 0;
 
+  // Live notifications via SSE
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let es;
+    try {
+      es = new EventSource('/api/notifications/stream');
+      es.addEventListener('message', () => {
+        // Invalidate notification-related queries
+        queryClient.invalidateQueries('notifications-count');
+        queryClient.invalidateQueries('notifications-page');
+      });
+    } catch (_) {}
+    return () => { try { es && es.close(); } catch (_) {} };
+  }, [isAuthenticated, queryClient]);
+
   return (
     <BootstrapNavbar 
       bg="dark" 
@@ -120,6 +136,8 @@ const Navbar = () => {
                     )}
                   </Nav.Link>
                 )}
+
+                {/* Admin direct link removed: admins land on role-aware Home ('/') */}
 
                 <Nav.Link 
                   as={Link} 
@@ -317,6 +335,12 @@ const Navbar = () => {
                       <i className="bi bi-people me-2"></i>
                       User Management
                     </NavDropdown.Item>
+                    {user?.role === 'admin' && (
+                      <NavDropdown.Item as={Link} to="/admin/audit" onClick={handleNavClick} active={isActive('/admin/audit')}>
+                        <i className="bi bi-clipboard-data me-2"></i>
+                        Audit Logs
+                      </NavDropdown.Item>
+                    )}
                   </NavDropdown>
                 )}
               </>
@@ -353,6 +377,9 @@ const Navbar = () => {
                       <i className="bi bi-person-circle me-1"></i>
                     )}
                     {user?.firstName} {user?.lastName}
+                    {user?.role && (
+                      <span className="badge bg-secondary text-uppercase ms-2" style={{ fontSize: '0.6rem' }}>{String(user.role).replace('_',' ')}</span>
+                    )}
                     {unreadCount > 0 && (
                       <Badge bg="danger" className="ms-2">{unreadCount}</Badge>
                     )}
@@ -365,7 +392,7 @@ const Navbar = () => {
                   <i className="bi bi-person me-2"></i>
                   Profile
                 </NavDropdown.Item>
-                
+                {/* Admin Dashboard entry removed to keep a single dashboard at '/' */}
                 <NavDropdown.Item 
                   onClick={() => {
                     navigate('/reports/create');
@@ -375,7 +402,6 @@ const Navbar = () => {
                   <i className="bi bi-plus-circle me-2"></i>
                   Create Report
                 </NavDropdown.Item>
-
                 {unreadCount > 0 && (
                   <>
                     <NavDropdown.Divider />
@@ -385,7 +411,6 @@ const Navbar = () => {
                     </NavDropdown.Item>
                   </>
                 )}
-
                 <NavDropdown.Divider />
                 <NavDropdown.Item onClick={handleLogout}>
                   <i className="bi bi-box-arrow-right me-2"></i>

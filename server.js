@@ -8,6 +8,8 @@ const path = require('path');
 const helmet = require('helmet');
 const swaggerUi = require('swagger-ui-express');
 const YAML = require('yamljs');
+const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config({ override: true });
 
 // Import route modules
@@ -16,13 +18,18 @@ const reportRoutes = require('./routes/reports');
 const userRoutes = require('./routes/users');
 const dashboardRoutes = require('./routes/dashboard');
 const exportRoutes = require('./routes/export');
+const adminRoutes = require('./routes/admin');
+const notifications = require('./routes/notifications');
 
 const app = express();
 const PORT = process.env.PORT || 5003;
 // Nodemon restart trigger: env updated (CORS CLIENT_URL)
 
-// Security middleware
 app.use(helmet());
+// Request logging (dev only)
+if ((process.env.NODE_ENV || 'development') !== 'production') {
+  app.use(morgan('dev'));
+}
 // Body parsers
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -31,29 +38,55 @@ app.use(express.urlencoded({ extended: true }));
 app.set('trust proxy', 1);
 
   // CORS configuration
+  const extraAllowed = (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+
   app.use(cors({
     origin: (origin, callback) => {
-      const allowed = [
-        process.env.CLIENT_URL,
+      const isProd = (process.env.NODE_ENV || 'development') === 'production';
+      const baseAllowed = [process.env.CLIENT_URL, ...extraAllowed].filter(Boolean);
+      const devLocalhosts = [
+        // Common Vite/CRA dev ports
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:3001',
         'http://localhost:5173',
         'http://localhost:5174',
         'http://localhost:5182',
         'http://localhost:5178',
-        'http://127.0.0.1:5178',
         'http://localhost:5181',
         'http://127.0.0.1:5173',
         'http://127.0.0.1:5174',
         'http://127.0.0.1:5182',
-        'http://127.0.0.1:5181'
-      ].filter(Boolean);
+        'http://127.0.0.1:5178',
+        'http://127.0.0.1:5181',
+      ];
+      const allowed = isProd ? baseAllowed : [...baseAllowed, ...devLocalhosts];
       if (!origin || allowed.includes(origin)) return callback(null, true);
       return callback(new Error('CORS not allowed'), false);
     },
-    credentials: true
+    credentials: true,
   }));
 
-// Static files
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Rate limiting (protect sensitive routes)
+const RATE_LIMIT_MAX = parseInt(process.env.RATE_LIMIT_MAX || '100', 10);
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+const exportLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: Math.max(20, Math.floor(RATE_LIMIT_MAX / 2)),
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/auth', authLimiter);
+app.use('/api/export', exportLimiter);
 
 // Enhanced Database connection configuration (PostgreSQL only)
 const DB_CLIENT = 'postgres';
@@ -198,7 +231,14 @@ async function testConnection() {
     console.error('3. Test connection with psql or pgAdmin');
     console.error('4. Check firewall settings');
     console.error('5. Ensure database exists and role has access\n');
-    
+
+    // In development, do not exit — start API without DB to unblock frontend wiring
+    if ((process.env.NODE_ENV || 'development') !== 'production') {
+      console.warn('⚠️  Continuing without database connection (development mode).');
+      return; // allow server to start
+    }
+
+    // In production, fail fast
     process.exit(1);
   }
 }
@@ -209,6 +249,8 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/export', exportRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/notifications', notifications.router);
 
 // Simple public test endpoint to verify routing without auth
 app.get('/api/users/public-test', (req, res) => {
@@ -347,11 +389,9 @@ app.use('/api/*', (req, res) => {
   res.status(404).json({ error: 'API endpoint not found' });
 });
 
-// Start server with enhanced logging
 async function startServer() {
   try {
-    await testConnection();
-    
+    // Start listening first so frontend can reach API even if DB is down
     const server = app.listen(PORT, () => {
       console.log('\n🚀 Faculty Reporting System Server Started!');
       console.log('=====================================');
@@ -364,7 +404,7 @@ async function startServer() {
       
       if (process.env.NODE_ENV === 'development') {
         console.log('💡 Development Tips:');
-        console.log('   - Frontend will run on http://localhost:3000');
+        console.log('   - Frontend will run on http://localhost:5173');
         console.log('   - Use pgAdmin/psql to manage database');
         console.log('   - Check /api/health for server status');
         console.log('   - Check /api/db-test for database info\n');
@@ -381,7 +421,15 @@ async function startServer() {
       }
       process.exit(1);
     });
-    
+    // Optionally skip DB test when explicitly requested in dev
+    if (process.env.SKIP_DB !== '1') {
+      testConnection().catch((err) => {
+        console.error('❌ Background DB connection test failed:', err.message);
+      });
+    } else {
+      console.warn('⚠️  SKIP_DB=1 set: skipping DB connection test at startup');
+    }
+
   } catch (error) {
     console.error('❌ Failed to start server:', error.message);
     process.exit(1);

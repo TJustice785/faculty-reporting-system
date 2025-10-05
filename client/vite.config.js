@@ -7,7 +7,7 @@ export default defineConfig({
   base: '/',
   server: {
     host: '0.0.0.0',
-    port: 5173,
+    port: 3000,
     strictPort: false,
     open: false,
     hmr: {
@@ -16,12 +16,12 @@ export default defineConfig({
     // Proxy API requests to the backend server during development
     proxy: {
       '/api': {
-        target: 'http://localhost:5003',
+        target: 'http://localhost:5000',
         changeOrigin: true,
         secure: false,
       },
       '/uploads': {
-        target: 'http://localhost:5003',
+        target: 'http://localhost:5000',
         changeOrigin: true,
         secure: false,
       },

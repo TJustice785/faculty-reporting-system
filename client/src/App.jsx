@@ -23,8 +23,11 @@ import ReportDetail from './pages/reports/ReportDetail';
 import LecturerReportForm from './pages/reports/LecturerReportForm.jsx';
 import Profile from './pages/Profile.jsx';
 import Users from './pages/admin/Users.jsx';
+import AdminDashboard from './pages/admin/AdminDashboard.jsx';
+import AuditLogs from './pages/admin/AuditLogs.jsx';
 import Analytics from './pages/Analytics.jsx';
 import NotFound from './pages/NotFound.jsx';
+import Home from './pages/Home.jsx';
 import MyProgress from './pages/MyProgress.jsx';
 import Notifications from './pages/Notifications.jsx';
 import PendingActions from './pages/PendingActions.jsx';
@@ -66,7 +69,7 @@ function App() {
             <main className="main-content">
               <Routes>
                 {/* Public Routes */}
-                <Route path="/" element={<Dashboard />} />
+                <Route path="/" element={<Home />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 
@@ -105,6 +108,17 @@ function App() {
                 <Route path="/analytics" element={
                   <ProtectedRoute roles={['admin', 'program_leader', 'principal_lecturer', 'faculty_manager']}>
                     <Analytics />
+                  </ProtectedRoute>
+                } />
+
+                <Route path="/admin" element={
+                  <ProtectedRoute roles={['admin']}>
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                } />
+                <Route path="/admin/audit" element={
+                  <ProtectedRoute roles={['admin']}>
+                    <AuditLogs />
                   </ProtectedRoute>
                 } />
                 

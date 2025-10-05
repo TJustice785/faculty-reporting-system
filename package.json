@@ -1,37 +1,40 @@
 {
-  "name": "faculty-reporting-system-client",
+  "name": "faculty-reporting-system",
   "private": true,
   "version": "1.0.0",
-  "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview --port 5174"
+    "dev:client": "npm --prefix client run dev",
+    "build:client": "npm --prefix client run build",
+    "preview:client": "npm --prefix client run preview",
+    "dev:server": "nodemon server.js",
+    "start:server": "node server.js",
+    "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
+    "build": "npm run build:client",
+    "db:apply": "node scripts/apply_pg_schema.js",
+    "db:seed": "node scripts/seed_pg_demo_data.js",
+    "db:setup": "npm run db:apply && npm run db:seed",
+    "db:index": "node scripts/create_pg_indexes.js",
+    "admin:create": "node scripts/create_admin_user.js"
   },
   "dependencies": {
-    "@fontsource/inter": "^5.2.8",
-    "axios": "^1.7.2",
-    "bootstrap": "^5.3.8",
-    "bootstrap-icons": "^1.13.1",
-    "chart.js": "^4.5.0",
-    "react": "^18.2.0",
-    "react-bootstrap": "^2.10.10",
-    "react-chartjs-2": "^5.3.0",
-    "react-dom": "^18.2.0",
-    "react-hot-toast": "^2.4.1",
-    "react-query": "^3.39.3",
-    "react-router-dom": "^6.25.1"
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-validator": "^7.2.1",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0",
+    "express-rate-limit": "^7.1.5",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.2",
+    "pdfkit": "^0.17.2",
+    "pg": "^8.12.0",
+    "swagger-ui-express": "^5.0.1",
+    "xlsx": "^0.18.5",
+    "yamljs": "^0.3.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^3.1.0",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.47",
-    "vite": "^4.5.14"
-  },
-  "browserslist": [
-    "defaults",
-    "not dead",
-    "ChromeAndroid >= 53",
-    "Safari >= 9"
-  ]
+    "concurrently": "^8.2.2",
+    "nodemon": "^3.1.7"
+  }
 }

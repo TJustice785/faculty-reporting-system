@@ -1,7 +1,7 @@
 const express = require('express');
 const XLSX = require('xlsx');
 const PDFDocument = require('pdfkit');
-const { verifyToken } = require('../middleware/auth');
+const { verifyToken, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -404,8 +404,8 @@ router.get('/analytics/excel', verifyToken, async (req, res) => {
     res.send(buffer);
 
   } catch (error) {
-    console.error('Analytics export error:', error);
-    res.status(500).json({ error: 'Failed to export analytics to Excel' });
+    console.error('Users export error:', error);
+    res.status(500).json({ error: 'Failed to export users to Excel' });
   }
 });
 

@@ -2,11 +2,14 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 
 // Create axios instance
+const isDev = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV;
 const api = axios.create({
-  baseURL:
-    (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL)
-      || (typeof process !== 'undefined' && process.env && process.env.REACT_APP_API_URL)
-      || '/api',
+  // In development, always go through Vite proxy via relative '/api'
+  baseURL: isDev
+    ? '/api'
+    : ((typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL)
+        || (typeof process !== 'undefined' && process.env && process.env.REACT_APP_API_URL)
+        || '/api'),
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -146,6 +149,7 @@ export const apiService = {
     delete: (id) => api.delete(`/users/${id}`),
     deactivate: (id) => api.post(`/users/${id}/deactivate`),
     reactivate: (id) => api.post(`/users/${id}/reactivate`),
+    resetPassword: (id) => api.post(`/users/${id}/reset-password`),
     enroll: (id, enrollmentData) => api.post(`/users/${id}/enroll`, enrollmentData),
     assignCourse: (id, courseData) => api.post(`/users/${id}/assign-course`, courseData),
     getAvailableCourses: (params) => api.get('/users/courses/available', { params }),
@@ -162,12 +166,22 @@ export const apiService = {
     }),
     reportsPdf: (params) => api.get('/export/reports/pdf', { 
       params, 
-      responseType: 'blob' 
     }),
     analyticsExcel: (params) => api.get('/export/analytics/excel', { 
       params, 
       responseType: 'blob' 
     }),
+    usersExcel: (params) => api.get('/export/users/excel', { 
+      params, 
+      responseType: 'blob' 
+    }),
+  },
+
+  // Admin endpoints
+  admin: {
+    getOverview: (days) => days ? api.get('/admin/overview', { params: { days } }) : api.get('/admin/overview'),
+    bulkUsers: (payload) => api.post('/admin/users/bulk', payload),
+    getAudit: (params) => api.get('/admin/audit', { params }),
   },
 };
 
@@ -175,7 +189,7 @@ export const apiService = {
 export const downloadFile = (blob, filename) => {
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.href = url;
+  link.setAttribute('href', url);
   link.setAttribute('download', filename);
   document.body.appendChild(link);
   link.click();

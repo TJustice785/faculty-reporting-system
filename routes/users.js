@@ -4,6 +4,7 @@ const path = require('path');
 const multer = require('multer');
 const { body, validationResult } = require('express-validator');
 const { verifyToken, authorize, authorizeOwnerOrHigher } = require('../middleware/auth');
+const { notifyAll, ensureNotificationsTable } = require('./notifications');
 
 const router = express.Router();
 
@@ -15,6 +16,50 @@ router.get('/public-test', (req, res) => {
     service: 'users',
     timestamp: new Date().toISOString(),
   });
+});
+
+// POST /api/users/:id/reset-password - Admin resets a user's password (returns temp password once)
+router.post('/:id/reset-password', verifyToken, authorize('admin'), async (req, res) => {
+  try {
+    const userId = req.params.id;
+    // Ensure user exists
+    const [rows] = await req.db.execute('SELECT id FROM users WHERE id = ?', [userId]);
+    if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
+
+    const generate = (len = 12) => {
+      const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%^&*';
+      let out = '';
+      for (let i = 0; i < len; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
+      return out;
+    };
+    const tempPassword = generate(12);
+    const bcrypt = require('bcryptjs');
+    const hash = await bcrypt.hash(tempPassword, 12);
+    await req.db.execute('UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [hash, userId]);
+
+    // Audit (do not store plaintext password)
+    await req.db.execute(`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL,
+        action TEXT NOT NULL,
+        target_type TEXT NOT NULL,
+        target_ids INT[] NOT NULL,
+        meta JSONB,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    await req.db.execute(
+      `INSERT INTO audit_logs (user_id, action, target_type, target_ids, meta)
+       VALUES (?, 'resetPassword', 'user', ?, ?)`,
+      [req.user.id, [Number(userId)], JSON.stringify({ length: tempPassword.length })]
+    );
+
+    res.json({ message: 'Temporary password generated. Displaying once.', tempPassword });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ error: 'Failed to reset password' });
+  }
 });
 
 // GET /api/users/lecturers/by-course?courseId= - List lecturers assigned to a course
@@ -81,9 +126,6 @@ router.put('/me', verifyToken, [
     const params = [];
     if (typeof firstName !== 'undefined') { fields.push('first_name = ?'); params.push(firstName); }
     if (typeof lastName !== 'undefined') { fields.push('last_name = ?'); params.push(lastName); }
-    if (typeof phone !== 'undefined') { fields.push('phone = ?'); params.push(phone); }
-
-    if (fields.length === 0) return res.status(400).json({ error: 'No valid fields to update' });
 
     const sql = `UPDATE users SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
     params.push(userId);
@@ -94,6 +136,7 @@ router.put('/me', verifyToken, [
     res.status(500).json({ error: 'Failed to update profile' });
   }
 });
+
 
 // Configure multer storage for avatars
 const avatarStorage = multer.diskStorage({
@@ -261,6 +304,8 @@ router.get('/:id', verifyToken, authorize('admin', 'program_leader', 'principal_
 router.put('/:id', [
   verifyToken,
   authorizeOwnerOrHigher,
+  body('username').optional().isLength({ min: 3, max: 50 }).matches(/^[a-zA-Z0-9_]+$/),
+  body('email').optional().isEmail().normalizeEmail(),
   body('firstName').optional().isLength({ max: 50 }),
   body('lastName').optional().isLength({ max: 50 }),
   body('role').optional().isIn(['admin', 'student', 'lecturer', 'program_leader', 'principal_lecturer', 'faculty_manager']),
@@ -273,16 +318,39 @@ router.put('/:id', [
     }
 
     const userId = req.params.id;
-    const { firstName, lastName, role, is_active, phone } = req.body;
+    const { username, email, firstName, first_name, lastName, last_name, role, is_active, phone } = req.body;
+
+    // Load current row for comparison
+    const [beforeRows] = await req.db.execute(
+      'SELECT id, username, email, role, first_name, last_name, phone, is_active FROM users WHERE id = ?',
+      [userId]
+    );
+    if (beforeRows.length === 0) return res.status(404).json({ error: 'User not found' });
+    const before = beforeRows[0];
+
+    // If username/email provided and changed, enforce uniqueness
+    if (typeof username !== 'undefined' && username !== before.username) {
+      const [u1] = await req.db.execute('SELECT id FROM users WHERE username = ? AND id <> ?', [username, userId]);
+      if (u1.length > 0) return res.status(400).json({ error: 'Username already in use' });
+    }
+    if (typeof email !== 'undefined' && email !== before.email) {
+      const [u2] = await req.db.execute('SELECT id FROM users WHERE email = ? AND id <> ?', [email, userId]);
+      if (u2.length > 0) return res.status(400).json({ error: 'Email already in use' });
+    }
 
     // Build dynamic update
     const fields = [];
     const params = [];
-    if (typeof firstName !== 'undefined') { fields.push('first_name = ?'); params.push(firstName); }
-    if (typeof lastName !== 'undefined') { fields.push('last_name = ?'); params.push(lastName); }
-    if (typeof role !== 'undefined') { fields.push('role = ?'); params.push(role); }
-    if (typeof phone !== 'undefined') { fields.push('phone = ?'); params.push(phone); }
-    if (typeof is_active !== 'undefined') { fields.push('is_active = ?'); params.push(!!is_active); }
+    const changed = {};
+    if (typeof username !== 'undefined' && username !== before.username) { fields.push('username = ?'); params.push(username); changed.username = { from: before.username, to: username }; }
+    if (typeof email !== 'undefined' && email !== before.email) { fields.push('email = ?'); params.push(email); changed.email = { from: before.email, to: email }; }
+    const fn = typeof firstName !== 'undefined' ? firstName : (typeof first_name !== 'undefined' ? first_name : undefined);
+    const ln = typeof lastName !== 'undefined' ? lastName : (typeof last_name !== 'undefined' ? last_name : undefined);
+    if (typeof fn !== 'undefined' && fn !== before.first_name) { fields.push('first_name = ?'); params.push(fn); changed.firstName = { from: before.first_name, to: fn }; }
+    if (typeof ln !== 'undefined' && ln !== before.last_name) { fields.push('last_name = ?'); params.push(ln); changed.lastName = { from: before.last_name, to: ln }; }
+    if (typeof role !== 'undefined' && role !== before.role) { fields.push('role = ?'); params.push(role); changed.role = { from: before.role, to: role }; }
+    if (typeof phone !== 'undefined' && phone !== before.phone) { fields.push('phone = ?'); params.push(phone); changed.phone = { from: before.phone, to: phone }; }
+    if (typeof is_active !== 'undefined' && (!!is_active) !== before.is_active) { fields.push('is_active = ?'); params.push(!!is_active); changed.is_active = { from: before.is_active, to: !!is_active }; }
 
     if (fields.length === 0) {
       return res.status(400).json({ error: 'No valid fields to update' });
@@ -320,6 +388,12 @@ router.post('/:id/deactivate', verifyToken, authorize('admin', 'program_leader',
   try {
     const userId = req.params.id;
     await req.db.execute('UPDATE users SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [userId]);
+    await ensureNotificationsTable(req.db);
+    await req.db.execute(
+      `INSERT INTO notifications (user_id, type, title, message) VALUES (?, 'account', 'Account deactivated', 'Your account has been deactivated by an administrator.')`,
+      [Number(userId)]
+    );
+    notifyAll({ type: 'notification:new' });
     res.json({ message: 'User deactivated' });
   } catch (error) {
     console.error('Deactivate user error:', error);
@@ -332,6 +406,12 @@ router.post('/:id/reactivate', verifyToken, authorize('admin', 'program_leader',
   try {
     const userId = req.params.id;
     await req.db.execute('UPDATE users SET is_active = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [userId]);
+    await ensureNotificationsTable(req.db);
+    await req.db.execute(
+      `INSERT INTO notifications (user_id, type, title, message) VALUES (?, 'account', 'Account reactivated', 'Your account has been reactivated by an administrator.')`,
+      [Number(userId)]
+    );
+    notifyAll({ type: 'notification:new' });
     res.json({ message: 'User reactivated' });
   } catch (error) {
     console.error('Reactivate user error:', error);

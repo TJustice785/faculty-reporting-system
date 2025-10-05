@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { apiService } from '../../services/api';
+import { useAuth } from '../../context/AuthContext.jsx';
 import toast from 'react-hot-toast';
 
 export default function Users() {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -10,6 +12,12 @@ export default function Users() {
   const [error, setError] = useState(null);
   const [showList, setShowList] = useState(false);
   const [loadedOnce, setLoadedOnce] = useState(false);
+  const [selected, setSelected] = useState([]);
+  const [bulkRole, setBulkRole] = useState('student');
+  const [editId, setEditId] = useState(null);
+  const [editForm, setEditForm] = useState({ username: '', email: '', firstName: '', lastName: '' });
+  const [resettingId, setResettingId] = useState(null);
+  const [tempPassword, setTempPassword] = useState('');
 
   const [form, setForm] = useState({
     username: '',
@@ -31,6 +39,8 @@ export default function Users() {
       const { data } = await apiService.users.getAll();
       // Some backends return array directly, others wrap in { users }
       setUsers(Array.isArray(data) ? data : (data.users || []));
+      // Reset selections when list refreshes
+      setSelected([]);
     } catch (e) {
       const message = e.response?.data?.error || 'Failed to fetch users';
       setError(message);
@@ -38,6 +48,24 @@ export default function Users() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const resetPassword = async (id) => {
+    if (!confirm('Generate a temporary password for this user? It will be shown once.')) return;
+    try {
+      setResettingId(id);
+      const { data } = await apiService.users.resetPassword(id);
+      setTempPassword(data?.tempPassword || '');
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Failed to reset password');
+    } finally {
+      setResettingId(null);
+    }
+  };
+
+  const closeTempModal = () => setTempPassword('');
+  const copyTemp = async () => {
+    try { await navigator.clipboard.writeText(tempPassword); toast.success('Copied'); } catch { /* noop */ }
   };
 
   useEffect(() => {
@@ -102,6 +130,41 @@ export default function Users() {
     }
   };
 
+  const startEdit = (u) => {
+    setEditId(u.id);
+    setEditForm({
+      username: u.username || '',
+      email: u.email || '',
+      firstName: u.firstName ?? u.first_name ?? '',
+      lastName: u.lastName ?? u.last_name ?? '',
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditId(null);
+    setEditForm({ username: '', email: '', firstName: '', lastName: '' });
+  };
+
+  const saveEdit = async (id) => {
+    try {
+      const payload = {
+        username: editForm.username,
+        email: editForm.email,
+        firstName: editForm.firstName,
+        lastName: editForm.lastName,
+        // also send snake_case for backends that expect it
+        first_name: editForm.firstName,
+        last_name: editForm.lastName,
+      };
+      await apiService.users.update(id, payload);
+      toast.success('User updated');
+      cancelEdit();
+      await loadUsers();
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Failed to update user');
+    }
+  };
+
   return (
     <div className="container py-4">
       <div className="d-flex justify-content-between align-items-center mb-3">
@@ -115,6 +178,25 @@ export default function Users() {
           </button>
         </div>
       </div>
+
+      {/* Bulk tools (admin only) */}
+      {showList && currentUser?.role === 'admin' && (
+        <div className="card card-body mb-3">
+          <div className="d-flex flex-wrap align-items-center gap-2">
+            <span className="me-2">Bulk actions for {selected.length} selected:</span>
+            <button className="btn btn-sm btn-outline-success" onClick={() => doBulk('activate')} disabled={selected.length === 0}>Activate</button>
+            <button className="btn btn-sm btn-outline-warning" onClick={() => doBulk('deactivate')} disabled={selected.length === 0}>Deactivate</button>
+            <button className="btn btn-sm btn-outline-danger" onClick={() => doBulk('delete')} disabled={selected.length === 0}>Delete</button>
+            <div className="d-flex align-items-center gap-2 ms-2">
+              <select className="form-select form-select-sm" value={bulkRole} onChange={e => setBulkRole(e.target.value)}>
+                {roles.map(r => <option key={r} value={r}>{r}</option>)}
+                <option value="admin">admin</option>
+              </select>
+              <button className="btn btn-sm btn-outline-primary" onClick={() => doBulk('setRole')} disabled={selected.length === 0}>Set Role</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {adding && (
         <form className="card card-body mb-4" onSubmit={handleCreate}>
@@ -162,6 +244,12 @@ export default function Users() {
           <table className="table table-striped align-middle">
             <thead>
               <tr>
+                <th>
+                  <input type="checkbox"
+                         aria-label="Select all"
+                         checked={selected.length > 0 && selected.length === users.length}
+                         onChange={e => toggleAll(e.target.checked)} />
+                </th>
                 <th>ID</th>
                 <th>Username</th>
                 <th>Email</th>
@@ -174,10 +262,37 @@ export default function Users() {
             <tbody>
               {users.map((u) => (
                 <tr key={u.id}>
+                  <td>
+                    <input type="checkbox"
+                           aria-label={`Select user ${u.id}`}
+                           checked={selected.includes(u.id)}
+                           onChange={e => toggleOne(u.id, e.target.checked)} />
+                  </td>
                   <td>{u.id}</td>
-                  <td>{u.username}</td>
-                  <td>{u.email}</td>
-                  <td>{[u.firstName || u.first_name, u.lastName || u.last_name].filter(Boolean).join(' ')}</td>
+                  <td>
+                    {currentUser?.role === 'admin' && editId === u.id ? (
+                      <input className="form-control form-control-sm" value={editForm.username} onChange={e => setEditForm({ ...editForm, username: e.target.value })} />
+                    ) : (
+                      u.username
+                    )}
+                  </td>
+                  <td>
+                    {currentUser?.role === 'admin' && editId === u.id ? (
+                      <input type="email" className="form-control form-control-sm" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} />
+                    ) : (
+                      u.email
+                    )}
+                  </td>
+                  <td>
+                    {currentUser?.role === 'admin' && editId === u.id ? (
+                      <div className="d-flex gap-2">
+                        <input className="form-control form-control-sm" placeholder="First" style={{maxWidth: 140}} value={editForm.firstName} onChange={e => setEditForm({ ...editForm, firstName: e.target.value })} />
+                        <input className="form-control form-control-sm" placeholder="Last" style={{maxWidth: 140}} value={editForm.lastName} onChange={e => setEditForm({ ...editForm, lastName: e.target.value })} />
+                      </div>
+                    ) : (
+                      [u.firstName || u.first_name, u.lastName || u.last_name].filter(Boolean).join(' ')
+                    )}
+                  </td>
                   <td>
                     <select
                       className="form-select form-select-sm"
@@ -185,6 +300,7 @@ export default function Users() {
                       onChange={(e) => handleRoleChange(u.id, e.target.value)}
                     >
                       {roles.map(r => <option key={r} value={r}>{r}</option>)}
+                      <option value="admin">admin</option>
                     </select>
                   </td>
                   <td>
@@ -196,6 +312,21 @@ export default function Users() {
                   </td>
                   <td>
                     <div className="d-flex gap-2">
+                      {currentUser?.role === 'admin' && (
+                        editId === u.id ? (
+                          <>
+                            <button className="btn btn-sm btn-success" onClick={() => saveEdit(u.id)}>Save</button>
+                            <button className="btn btn-sm btn-secondary" onClick={cancelEdit}>Cancel</button>
+                          </>
+                        ) : (
+                          <button className="btn btn-sm btn-outline-primary" onClick={() => startEdit(u)}>Edit</button>
+                        )
+                      )}
+                      {currentUser?.role === 'admin' && (
+                        <button className="btn btn-sm btn-outline-dark" onClick={() => resetPassword(u.id)} disabled={resettingId === u.id}>
+                          {resettingId === u.id ? 'Resetting…' : 'Reset Password'}
+                        </button>
+                      )}
                       <button className="btn btn-sm btn-outline-warning" onClick={() => handleToggleActive(u)}>
                         {u.is_active === false ? 'Reactivate' : 'Deactivate'}
                       </button>
@@ -208,6 +339,30 @@ export default function Users() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Temporary password modal */}
+      {tempPassword && (
+        <div className="modal fade show" style={{ display: 'block', background: 'rgba(0,0,0,0.5)' }} tabIndex="-1" role="dialog" aria-modal="true">
+          <div className="modal-dialog modal-sm modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Temporary Password</h5>
+                <button type="button" className="btn-close" aria-label="Close" onClick={closeTempModal}></button>
+              </div>
+              <div className="modal-body">
+                <div className="alert alert-warning small">Shown once. Copy and share securely with the user.</div>
+                <div className="input-group">
+                  <input className="form-control" value={tempPassword} readOnly />
+                  <button className="btn btn-outline-secondary" onClick={copyTemp}>Copy</button>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-primary" onClick={closeTempModal}>Done</button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

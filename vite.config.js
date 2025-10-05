@@ -1,3 +1,6 @@
+// NOTE: This root-level Vite config is not used.
+// The active Vite configuration lives at `client/vite.config.js`.
+// Keeping this file to avoid confusion; feel free to delete it.
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 // https://vitejs.dev/config/

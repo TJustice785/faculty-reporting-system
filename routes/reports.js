@@ -4,6 +4,7 @@ const path = require('path');
 const multer = require('multer');
 const { body, validationResult } = require('express-validator');
 const { verifyToken, authorize, validateReportAccess } = require('../middleware/auth');
+const { notifyAll, ensureNotificationsTable } = require('./notifications');
 
 const router = express.Router();
 
@@ -264,6 +265,21 @@ router.put('/:id/moderate', [
     if (sets.length === 0) return res.status(400).json({ error: 'Nothing to update' });
     sets.push('updated_at = CURRENT_TIMESTAMP');
     await req.db.execute(`UPDATE reports SET ${sets.join(', ')} WHERE id = ?`, [...params, reportId]);
+
+    // Notify report owner about status change
+    await ensureNotificationsTable(req.db);
+    const title = 'Report updated';
+    const msg = status ? `Your report #${reportId} status changed to ${status}` : `Your report #${reportId} was updated by a reviewer.`;
+    const [ownerRows] = await req.db.execute('SELECT reporter_id FROM reports WHERE id = ?', [reportId]);
+    const ownerId = ownerRows?.[0]?.reporter_id;
+    if (ownerId) {
+      await req.db.execute(
+        `INSERT INTO notifications (user_id, type, title, message) VALUES (?, 'report', ?, ?)`,
+        [ownerId, title, msg]
+      );
+      notifyAll({ type: 'notification:new' });
+    }
+
     res.json({ message: 'Report moderated successfully' });
   } catch (error) {
     console.error('Moderate report error:', error);
@@ -575,10 +591,17 @@ router.post('/:id/feedback', [
       [newStatus, reportId]
     );
 
-    res.status(201).json({
-      message: 'Feedback added successfully',
-      feedbackId: result[0]?.id
-    });
+    // Notify report owner about feedback
+    await ensureNotificationsTable(req.db);
+    const fbTitle = 'New feedback on your report';
+    const fbMsg = `Your report #${reportId} received ${feedbackType} feedback`;
+    await req.db.execute(
+      `INSERT INTO notifications (user_id, type, title, message) VALUES (?, 'feedback', ?, ?)`,
+      [report.reporter_id, fbTitle, fbMsg]
+    );
+    notifyAll({ type: 'notification:new' });
+
+    res.status(201).json({ message: 'Feedback added successfully', feedbackId: result[0]?.id });
 
   } catch (error) {
     console.error('Add feedback error:', error);

@@ -55,7 +55,7 @@ DB_HOST=localhost
 DB_PORT=5432
 DB_USER=faculty_reporting_system
 DB_PASSWORD=admin@123
-DB_NAME=faculty_reporting_system
+DB_NAME=faculty-reporting-system1
 
 # Admin account for schema/privileges (optional)
 DB_ADMIN_USER=postgres

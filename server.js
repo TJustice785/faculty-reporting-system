@@ -95,7 +95,7 @@ const dbConfig = {
   port: parseInt(process.env.DB_PORT || 5432, 10),
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || 'admin@123',
-  database: process.env.DB_NAME || 'faculty_reporting_system1',
+  database: process.env.DB_NAME || 'faculty-reporting-system1',
   connectionLimit: 10,
 };
 
@@ -119,8 +119,9 @@ function toPostgresPlaceholders(sql) {
     console.log('🔗 Using DATABASE_URL for Postgres connection');
     pool = new PgPool({
       connectionString: process.env.DATABASE_URL,
-      // Render/Railway often require SSL; disable cert verification for managed instances
-      ssl: { rejectUnauthorized: false },
+      // Use SSL only when explicitly requested (e.g., managed platforms)
+      // Align behavior with scripts/create_admin_user.js
+      ssl: process.env.DATABASE_SSL === '1' ? { rejectUnauthorized: false } : undefined,
       max: dbConfig.connectionLimit || 10,
       idleTimeoutMillis: 60000,
       connectionTimeoutMillis: 60000,

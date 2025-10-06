@@ -2,10 +2,10 @@
 -- Note: Run the CREATE DATABASE step from psql as a separate command.
 
 -- Optional: create the database (run from psql shell, not inside a transaction)
--- CREATE DATABASE faculty_reporting_system;
+-- CREATE DATABASE "faculty-reporting-system1";
 
 -- Connect to the database (psql only):
--- \c faculty_reporting_system
+-- \c "faculty-reporting-system1"
 
 -- Safer to use UTC timestamps
 SET TIME ZONE 'UTC';

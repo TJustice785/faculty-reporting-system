@@ -16,12 +16,12 @@ export default defineConfig({
     // Proxy API requests to the backend server during development
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: 'http://localhost:5003',
         changeOrigin: true,
         secure: false,
       },
       '/uploads': {
-        target: 'http://localhost:5000',
+        target: 'http://localhost:5003',
         changeOrigin: true,
         secure: false,
       },
@@ -29,6 +29,15 @@ export default defineConfig({
   },
   build: {
     outDir: 'build',
+    chunkSizeWarningLimit: 1200,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom'],
+          vendor: ['axios', 'react-router-dom', 'react-bootstrap', 'chart.js']
+        }
+      }
+    }
   },
   preview: {
     host: '0.0.0.0',

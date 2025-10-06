@@ -16,7 +16,7 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env'), override: t
     DB_PORT = '5432',
     DB_USER = 'postgres',
     DB_PASSWORD = 'admin@123',
-    DB_NAME = 'faculty_reporting_system',
+    DB_NAME = 'faculty-reporting-system1',
     DB_ADMIN_USER,
     DB_ADMIN_PASSWORD,
   } = process.env;

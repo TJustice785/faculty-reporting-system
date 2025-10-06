@@ -14,7 +14,8 @@
     "db:seed": "node scripts/seed_pg_demo_data.js",
     "db:setup": "npm run db:apply && npm run db:seed",
     "db:index": "node scripts/create_pg_indexes.js",
-    "admin:create": "node scripts/create_admin_user.js"
+    "admin:create": "node scripts/create_admin_user.js",
+    "start:local": "scripts\\start_dev_local.cmd"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

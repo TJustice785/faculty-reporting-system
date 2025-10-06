@@ -23,7 +23,7 @@ static_sites:
     branch: main
     rootDir: client
     buildCommand: "npm --prefix client run build"
-    publishDir: client/build
+    publishDir: build
     envVars:
       - key: NODE_ENV
         value: production

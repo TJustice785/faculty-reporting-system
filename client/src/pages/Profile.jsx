@@ -111,7 +111,13 @@ export default function Profile() {
             <Card.Body className="text-center">
               <div className="mb-3">
                 {profile.avatarUrl ? (
-                  <img src={profile.avatarUrl} alt="Avatar" className="rounded-circle" style={{ width: 140, height: 140, objectFit: 'cover', border: '1px solid #eee' }} />
+                  <img
+                    src={profile.avatarUrl}
+                    alt="Avatar"
+                    className="rounded-circle"
+                    style={{ width: 140, height: 140, objectFit: 'cover', border: '1px solid #eee' }}
+                    onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/default-avatar.svg'; }}
+                  />
                 ) : (
                   <div className="rounded-circle bg-light d-flex align-items-center justify-content-center" style={{ width: 140, height: 140, border: '1px solid #eee' }}>
                     <i className="bi bi-person fs-1 text-muted"></i>

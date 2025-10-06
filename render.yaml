@@ -22,7 +22,7 @@ static_sites:
   - name: faculty-reporting-frontend
     branch: main
     rootDir: client
-    buildCommand: "npm --prefix client run build"
+    buildCommand: "npm install && npm run build"
     publishDir: build
     envVars:
       - key: NODE_ENV

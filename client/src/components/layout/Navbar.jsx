@@ -372,7 +372,13 @@ const Navbar = () => {
                 title={
                   <span className="d-inline-flex align-items-center">
                     {user?.avatarUrl ? (
-                      <img src={user.avatarUrl} alt="Avatar" className="rounded-circle me-2" style={{ width: 24, height: 24, objectFit: 'cover' }} />
+                      <img
+                        src={user.avatarUrl}
+                        alt="Avatar"
+                        className="rounded-circle me-2"
+                        style={{ width: 24, height: 24, objectFit: 'cover' }}
+                        onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/default-avatar.svg'; }}
+                      />
                     ) : (
                       <i className="bi bi-person-circle me-1"></i>
                     )}

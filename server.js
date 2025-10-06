@@ -95,7 +95,7 @@ const dbConfig = {
   port: parseInt(process.env.DB_PORT || 5432, 10),
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || 'admin@123',
-  database: process.env.DB_NAME || 'faculty_reporting',
+  database: process.env.DB_NAME || 'faculty_reporting_system1',
   connectionLimit: 10,
 };
 

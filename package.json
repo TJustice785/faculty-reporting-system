@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "scripts": {
   "dev:client": "npm --prefix client run dev",
-  "build:client": "npm --prefix client install && npm --prefix client run build",
+  "build:client": "npm --prefix client install --include=dev && npm --prefix client run build",
     "preview:client": "npm --prefix client run preview",
     "dev:server": "nodemon server.js",
     "start:server": "node server.js",

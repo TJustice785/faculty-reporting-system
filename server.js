@@ -4,6 +4,7 @@ const { Pool: PgPool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
+const fs = require('fs');
 const path = require('path');
 const helmet = require('helmet');
 const swaggerUi = require('swagger-ui-express');
@@ -357,10 +358,37 @@ app.get('/api/db-test', async (req, res) => {
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, 'client/build')));
   
+  // Serve favicon fallback to avoid 502s when /favicon.ico requested
+  app.get('/favicon.ico', (req, res) => {
+    try {
+      const buildDir = path.join(__dirname, 'client', 'build');
+      const svg = path.join(buildDir, 'favicon.svg');
+      const ico = path.join(buildDir, 'favicon.ico');
+
+      if (fs.existsSync(svg)) {
+        res.type('image/svg+xml');
+        return res.sendFile(svg);
+      }
+      if (fs.existsSync(ico)) {
+        res.type('image/x-icon');
+        return res.sendFile(ico);
+      }
+
+      // no favicon available — return no content so client won't retry
+      return res.status(204).end();
+    } catch (err) {
+      // don't crash the server if something goes wrong
+      console.error('favicon fallback error:', err);
+      return res.status(204).end();
+    }
+  });
+
   app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
   });
 }
+
+ 
 
 // Enhanced error handling middleware
 app.use((err, req, res, next) => {

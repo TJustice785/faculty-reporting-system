@@ -8,6 +8,7 @@
     "preview:client": "npm --prefix client run preview",
     "dev:server": "nodemon server.js",
     "start:server": "node server.js",
+    "start": "node server.js",
     "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
     "build": "npm run build:client",
     "db:apply": "node scripts/apply_pg_schema.js",

@@ -1,0 +1,43 @@
+# render.yaml - Render service definitions for faculty-reporting-system
+# This file defines a backend web service, a static site for the client, and a managed Postgres database.
+# After committing & pushing, connect this repo to Render and create services from this file (Render will read it).
+
+services:
+  - type: web
+    name: faculty-reporting-backend
+    env: node
+    plan: free
+    branch: main
+    buildCommand: "npm install && npm --prefix client run build"
+    startCommand: "npm run start:server"
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SKIP_DB
+        value: "0"
+      # JWT_SECRET and DATABASE_URL should be set in Render dashboard (secrets), not committed here
+
+static_sites:
+  - name: faculty-reporting-frontend
+    branch: main
+    rootDir: client
+    buildCommand: "npm --prefix client run build"
+    publishDir: client/build
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # set VITE_API_URL in Render dashboard after backend is deployed
+
+databases:
+  - name: faculty-reporting-db
+    engine: postgres
+    version: "15"
+    plan: free
+    # Render will provision the DB; copy the DATABASE_URL from Render dashboard and add it to the backend service envs
+
+# Notes:
+# - After pushing this file, go to Render Dashboard -> New -> Import from GitHub and select this repo.
+# - Render will read render.yaml and propose services; confirm and create them.
+# - Once the DB is provisioned, add the DATABASE_URL and JWT_SECRET to the backend service's environment variables (Render dashboard > service > Environment).
+# - After services are created, use Render Shell to run the bootstrap script or run it locally with the DATABASE_URL.

@@ -41,8 +41,8 @@ app.use(
         "'self'",
         'blob:',
         // Preserve useful defaults we see in modern browsers
-        'wasm-unsafe-eval',
-        'inline-speculation-rules',
+        "'wasm-unsafe-eval'",
+        "'inline-speculation-rules'",
       ],
       // allow workers loaded from blob:
       workerSrc: ["'self'", 'blob:'],

@@ -38,16 +38,17 @@ app.use(express.urlencoded({ extended: true }));
 // If running behind a proxy (e.g., reverse proxy), trust it to get real client IP
 app.set('trust proxy', 1);
 
-  // CORS configuration
+  // CORS configuration — apply ONLY to API routes (avoid interfering with static assets)
   const extraAllowed = (process.env.ALLOWED_ORIGINS || '')
     .split(',')
     .map(s => s.trim())
     .filter(Boolean);
+  const renderUrl = process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL || process.env.URL;
 
-  app.use(cors({
+  app.use('/api', cors({
     origin: (origin, callback) => {
       const isProd = (process.env.NODE_ENV || 'development') === 'production';
-      const baseAllowed = [process.env.CLIENT_URL, ...extraAllowed].filter(Boolean);
+      const baseAllowed = [process.env.CLIENT_URL, renderUrl, ...extraAllowed].filter(Boolean);
       const devLocalhosts = [
         // Common Vite/CRA dev ports
         'http://localhost:3000',
@@ -66,7 +67,13 @@ app.set('trust proxy', 1);
         'http://127.0.0.1:5181',
       ];
       const allowed = isProd ? baseAllowed : [...baseAllowed, ...devLocalhosts];
-      if (!origin || allowed.includes(origin)) return callback(null, true);
+      // Allow requests without Origin (e.g., curl, server-to-server)
+      if (!origin) return callback(null, true);
+      // Allow any onrender.com origins in production to support the deployed app domain
+      if (isProd && /\.onrender\.com$/i.test(new URL(origin).hostname)) {
+        return callback(null, true);
+      }
+      if (allowed.includes(origin)) return callback(null, true);
       return callback(new Error('CORS not allowed'), false);
     },
     credentials: true,

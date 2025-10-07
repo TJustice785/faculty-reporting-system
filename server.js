@@ -7,6 +7,7 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const helmet = require('helmet');
+const compression = require('compression');
 const swaggerUi = require('swagger-ui-express');
 const YAML = require('yamljs');
 const morgan = require('morgan');
@@ -34,10 +35,12 @@ app.use(
     useDefaults: true,
     directives: {
       // allow our assets and inline data URIs + blob images (e.g., canvas, exports)
-      'img-src': ["'self'", 'data:', 'blob:'],
+      imgSrc: ["'self'", 'data:', 'blob:'],
     },
   })
 );
+// Gzip compression for faster asset delivery
+app.use(compression());
 // Request logging (dev only)
 if ((process.env.NODE_ENV || 'development') !== 'production') {
   app.use(morgan('dev'));
@@ -388,6 +391,18 @@ app.get('/api/db-test', async (req, res) => {
 
 // Serve static files from React build (for production)
 if (process.env.NODE_ENV === 'production') {
+  // Guard: log if client build is missing to aid troubleshooting on platform deploys
+  const buildIndex = path.join(__dirname, 'client', 'build', 'index.html');
+  if (!fs.existsSync(buildIndex)) {
+    console.warn('⚠️  client/build/index.html not found. Ensure Build Command runs `npm run build` on the platform.');
+  }
+
+  // Cache static assets (immutable hashed files) aggressively
+  app.use('/assets', express.static(path.join(__dirname, 'client', 'build', 'assets'), {
+    maxAge: '1y',
+    immutable: true,
+  }));
+  // Serve remaining static files with moderate caching
   app.use(express.static(path.join(__dirname, 'client/build')));
   
   // Serve favicon fallback to avoid 502s when /favicon.ico requested

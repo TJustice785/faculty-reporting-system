@@ -2,6 +2,9 @@
   "name": "faculty-reporting-system",
   "private": true,
   "version": "1.0.0",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
   "dev:client": "npm --prefix client run dev",
   "build:client": "npm --prefix client install --include=dev && npm --prefix client run build",

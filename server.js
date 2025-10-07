@@ -26,7 +26,18 @@ const app = express();
 const PORT = process.env.PORT || 5003;
 // Nodemon restart trigger: env updated (CORS CLIENT_URL)
 
+// Security headers
 app.use(helmet());
+// Relax CSP to allow blob: images used by the app (keep other defaults safe)
+app.use(
+  helmet.contentSecurityPolicy({
+    useDefaults: true,
+    directives: {
+      // allow our assets and inline data URIs + blob images (e.g., canvas, exports)
+      'img-src': ["'self'", 'data:', 'blob:'],
+    },
+  })
+);
 // Request logging (dev only)
 if ((process.env.NODE_ENV || 'development') !== 'production') {
   app.use(morgan('dev'));

@@ -36,6 +36,16 @@ app.use(
     directives: {
       // allow our assets and inline data URIs + blob images (e.g., canvas, exports)
       imgSrc: ["'self'", 'data:', 'blob:'],
+      // allow blob: scripts (e.g., dynamically generated workers/bundles)
+      scriptSrc: [
+        "'self'",
+        'blob:',
+        // Preserve useful defaults we see in modern browsers
+        'wasm-unsafe-eval',
+        'inline-speculation-rules',
+      ],
+      // allow workers loaded from blob:
+      workerSrc: ["'self'", 'blob:'],
     },
   })
 );

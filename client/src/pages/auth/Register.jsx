@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Row, Col, Form, Button, Spinner, Alert, InputGroup } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { apiService } from '../../services/api';
 import AuthLayout from '../../components/auth/AuthLayout.jsx';
 import './Auth.css';
 
@@ -17,13 +18,17 @@ const Register = () => {
     firstName: '',
     lastName: '',
     phone: '',
-    role: 'student'
+    role: 'student',
+    streamId: '',
+    courseId: ''
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [formError, setFormError] = useState('');
+  const [streams, setStreams] = useState([]);
+  const [courses, setCourses] = useState([]);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -32,12 +37,51 @@ const Register = () => {
     }
   }, [isAuthenticated, isLoading, navigate]);
 
+  // Load streams and optionally courses
+  const loadStreams = async () => {
+    try {
+      const { data } = await apiService.users.getPublicStreams();
+      setStreams(data?.streams || []);
+    } catch (_) {
+      setStreams([]);
+    }
+  };
+
+  const loadCourses = async (streamId) => {
+    try {
+      const { data } = await apiService.users.getPublicCourses({ stream_id: streamId });
+      setCourses(data?.courses || []);
+    } catch (_) {
+      setCourses([]);
+    }
+  };
+
+  useEffect(() => {
+    loadStreams();
+  }, []);
+
+  useEffect(() => {
+    if (formData.streamId) {
+      loadCourses(formData.streamId);
+    }
+  }, [formData.streamId]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
+
+    // When stream changes, reset course and reload courses list
+    if (name === 'streamId') {
+      setFormData(prev => ({ ...prev, courseId: '' }));
+      if (value) {
+        loadCourses(value).catch(() => {});
+      } else {
+        setCourses([]);
+      }
+    }
     
     // Clear error when user starts typing
     if (errors[name]) {
@@ -97,6 +141,17 @@ const Register = () => {
       newErrors.role = 'Please select a role';
     }
 
+    // Faculty/Course validation for student or lecturer
+    const needsAcademic = formData.role === 'student' || formData.role === 'lecturer';
+    if (needsAcademic) {
+      if (!String(formData.streamId || '').trim()) {
+        newErrors.streamId = 'Please select your faculty';
+      }
+      if (!String(formData.courseId || '').trim()) {
+        newErrors.courseId = 'Please select your course';
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -111,7 +166,13 @@ const Register = () => {
     setIsSubmitting(true);
 
     try {
-      const result = await register(formData);
+      const payload = {
+        ...formData,
+        // ensure numbers are sent for IDs if present
+        streamId: formData.streamId ? Number(formData.streamId) : undefined,
+        courseId: formData.courseId ? Number(formData.courseId) : undefined,
+      };
+      const result = await register(payload);
       
       if (result.success) {
         navigate('/', { replace: true });
@@ -274,6 +335,52 @@ const Register = () => {
             {errors.role}
           </Form.Control.Feedback>
         </Form.Group>
+
+        {/* Faculty and Course selection for Student/Lecturer */}
+        {(formData.role === 'student' || formData.role === 'lecturer') && (
+          <Row>
+            <Col md={6}>
+              <Form.Group className="mb-3">
+                <Form.Label>Faculty *</Form.Label>
+                <Form.Select
+                  name="streamId"
+                  value={formData.streamId || ''}
+                  onChange={handleChange}
+                  isInvalid={!!errors.streamId}
+                  disabled={isSubmitting}
+                >
+                  <option value="">Select faculty</option>
+                  {streams.map(s => (
+                    <option key={s.id} value={s.id}>{s.stream_name}</option>
+                  ))}
+                </Form.Select>
+                <Form.Control.Feedback type="invalid">
+                  {errors.streamId}
+                </Form.Control.Feedback>
+              </Form.Group>
+            </Col>
+            <Col md={6}>
+              <Form.Group className="mb-3">
+                <Form.Label>Course *</Form.Label>
+                <Form.Select
+                  name="courseId"
+                  value={formData.courseId || ''}
+                  onChange={handleChange}
+                  isInvalid={!!errors.courseId}
+                  disabled={isSubmitting || !formData.streamId}
+                >
+                  <option value="">Select course</option>
+                  {courses.map(c => (
+                    <option key={c.id} value={c.id}>{c.course_name} ({c.course_code})</option>
+                  ))}
+                </Form.Select>
+                <Form.Control.Feedback type="invalid">
+                  {errors.courseId}
+                </Form.Control.Feedback>
+              </Form.Group>
+            </Col>
+          </Row>
+        )}
 
         <Row>
           <Col md={6}>

@@ -43,6 +43,13 @@ const registerValidation = [
   body('role')
     .isIn(['student', 'lecturer', 'program_leader', 'principal_lecturer', 'faculty_manager'])
     .withMessage('Invalid role specified')
+  ,
+  body('streamId')
+    .optional({ nullable: true })
+    .isInt({ min: 1 }).withMessage('streamId must be a valid ID'),
+  body('courseId')
+    .optional({ nullable: true })
+    .isInt({ min: 1 }).withMessage('courseId must be a valid ID')
 ];
 
 // Login validation rules
@@ -76,7 +83,7 @@ router.post('/register', registerValidation, async (req, res) => {
       });
     }
 
-    const { username, email, password, firstName, lastName, role, phone } = req.body;
+    const { username, email, password, firstName, lastName, role, phone, streamId, courseId } = req.body;
 
     // Check if user already exists
     const [existingUsers] = await req.db.execute(
@@ -94,11 +101,41 @@ router.post('/register', registerValidation, async (req, res) => {
     const saltRounds = 12;
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
+    // Optional: validate stream and course exist if provided
+    let validStreamId = null;
+    let validCourseId = null;
+    if (streamId) {
+      const [streams] = await req.db.execute('SELECT id FROM streams WHERE id = ?', [streamId]);
+      if (streams.length === 0) return res.status(400).json({ error: 'Selected faculty (stream) not found' });
+      validStreamId = Number(streamId);
+    }
+    if (courseId) {
+      const [courses] = await req.db.execute('SELECT id, stream_id FROM courses WHERE id = ?', [courseId]);
+      if (courses.length === 0) return res.status(400).json({ error: 'Selected course not found' });
+      // If both provided, ensure course belongs to stream
+      if (validStreamId && courses[0].stream_id !== validStreamId) {
+        return res.status(400).json({ error: 'Selected course does not belong to the selected faculty' });
+      }
+      validCourseId = Number(courseId);
+      // if stream not provided, infer from course
+      if (!validStreamId) validStreamId = courses[0].stream_id;
+    }
+
     // Insert new user (PostgreSQL)
     const [result] = await req.db.execute(
-      `INSERT INTO users (username, email, password_hash, role, first_name, last_name, phone)
-       VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
-      [String(username).trim(), String(email).trim(), passwordHash, role, String(firstName).trim(), String(lastName).trim(), phone ? String(phone).trim() : null]
+      `INSERT INTO users (username, email, password_hash, role, first_name, last_name, phone, stream_id, course_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+      [
+        String(username).trim(),
+        String(email).trim(),
+        passwordHash,
+        role,
+        String(firstName).trim(),
+        String(lastName).trim(),
+        phone ? String(phone).trim() : null,
+        validStreamId,
+        validCourseId,
+      ]
     );
 
     const newUserId = result[0]?.id;
@@ -116,7 +153,9 @@ router.post('/register', registerValidation, async (req, res) => {
         role,
         firstName,
         lastName,
-        phone
+        phone,
+        streamId: validStreamId,
+        courseId: validCourseId
       },
       token
     });

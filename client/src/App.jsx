@@ -5,6 +5,7 @@ import { ReactQueryDevtools } from 'react-query/devtools';
 import { Toaster } from 'react-hot-toast';
 import './App.css';
 import Favicon from './components/common/Favicon.jsx';
+import Footer from './components/layout/Footer.jsx';
 
 // Context is applied at top-level in main.jsx
 
@@ -240,6 +241,7 @@ function App() {
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </main>
+            <Footer />
             {/* Toast Notifications */}
             <Toaster
               position="top-right"

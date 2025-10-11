@@ -62,6 +62,48 @@ router.post('/:id/reset-password', verifyToken, authorize('admin'), async (req, 
   }
 });
 
+// Public endpoints for registration: list streams and courses without auth
+// GET /api/users/public/streams - list all streams (faculties)
+router.get('/public/streams', async (req, res) => {
+  try {
+    const [streams] = await req.db.execute(`
+      SELECT 
+        s.id, s.stream_name, s.stream_code, s.description
+      FROM streams s
+      ORDER BY s.stream_name
+    `);
+    res.json({ streams });
+  } catch (error) {
+    console.error('Get public streams error:', error);
+    res.status(500).json({ error: 'Failed to fetch streams' });
+  }
+});
+
+// GET /api/users/public/courses?stream_id= - list courses (optionally by stream)
+router.get('/public/courses', async (req, res) => {
+  try {
+    const { stream_id } = req.query;
+    let query = `
+      SELECT 
+        c.id, c.course_name, c.course_code, c.credits, c.semester,
+        s.stream_name, s.stream_code, s.id as stream_id
+      FROM courses c
+      JOIN streams s ON c.stream_id = s.id
+    `;
+    const params = [];
+    if (stream_id) {
+      query += ' WHERE c.stream_id = ?';
+      params.push(stream_id);
+    }
+    query += ' ORDER BY s.stream_name, c.semester, c.course_name';
+    const [courses] = await req.db.execute(query, params);
+    res.json({ courses });
+  } catch (error) {
+    console.error('Get public courses error:', error);
+    res.status(500).json({ error: 'Failed to fetch courses' });
+  }
+});
+
 // GET /api/users/lecturers/by-course?courseId= - List lecturers assigned to a course
 router.get('/lecturers/by-course', verifyToken, async (req, res) => {
   try {

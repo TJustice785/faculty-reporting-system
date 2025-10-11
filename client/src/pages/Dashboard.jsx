@@ -92,7 +92,6 @@ const Dashboard = () => {
           <StatsCard
             title="Total Users"
             value={(publicData?.generalStats?.total_users ?? publicData?.total_users) || 0}
-            icon="bi-people"
             color="primary"
             variant="hero"
           />
@@ -101,7 +100,6 @@ const Dashboard = () => {
           <StatsCard
             title="Students"
             value={(publicData?.generalStats?.total_students ?? publicData?.total_students) || 0}
-            icon="bi-mortarboard"
             color="success"
             variant="hero"
           />
@@ -110,7 +108,6 @@ const Dashboard = () => {
           <StatsCard
             title="Lecturers"
             value={(publicData?.generalStats?.total_lecturers ?? publicData?.total_lecturers) || 0}
-            icon="bi-person-workspace"
             color="info"
             variant="hero"
           />
@@ -119,7 +116,6 @@ const Dashboard = () => {
           <StatsCard
             title="Courses"
             value={(publicData?.generalStats?.total_courses ?? publicData?.total_courses) || 0}
-            icon="bi-book"
             color="warning"
             variant="hero"
           />
@@ -131,7 +127,7 @@ const Dashboard = () => {
         <Col md={12}>
           <Card>
             <Card.Header>
-              <h6 className="mb-0"><i className="bi bi-graph-up me-2"></i>Overall Activity</h6>
+              <h6 className="mb-0">Overall Activity</h6>
             </Card.Header>
             <Card.Body>
               <TrendsMiniChart
@@ -148,7 +144,7 @@ const Dashboard = () => {
         <Col>
           <Card>
             <Card.Header>
-              <h5><i className="bi bi-bar-chart me-2"></i>Academic Streams</h5>
+              <h5>Academic Streams</h5>
             </Card.Header>
             <Card.Body>
               <Row>
@@ -180,16 +176,14 @@ const Dashboard = () => {
         <Col>
           <Card>
             <Card.Header>
-              <h5><i className="bi bi-activity me-2"></i>Recent Activity</h5>
+              <h5>Recent Activity</h5>
             </Card.Header>
             <Card.Body>
               {Array.isArray(publicData?.recentActivity) && publicData.recentActivity.length > 0 ? (
                 <div className="activity-list">
                   {publicData.recentActivity.map((activity, index) => (
                     <div key={index} className="activity-item d-flex align-items-center mb-2">
-                      <div className="activity-icon me-3">
-                        <i className="bi bi-file-text text-primary"></i>
-                      </div>
+                      <div className="me-3" aria-hidden="true">•</div>
                       <div className="flex-grow-1">
                         <div>
                           New report from {activity.user_role}
@@ -215,7 +209,7 @@ const Dashboard = () => {
         <Col md={6} className="mb-3 mb-md-0">
           <Card>
             <Card.Header>
-              <h6 className="mb-0"><i className="bi bi-people me-2"></i>Latest Users</h6>
+              <h6 className="mb-0">Latest Users</h6>
             </Card.Header>
             <Card.Body>
               {Array.isArray(publicData?.latest_users) && publicData.latest_users.length > 0 ? (
@@ -247,7 +241,7 @@ const Dashboard = () => {
         <Col md={6}>
           <Card>
             <Card.Header>
-              <h6 className="mb-0"><i className="bi bi-file-earmark-text me-2"></i>Latest Reports</h6>
+              <h6 className="mb-0">Latest Reports</h6>
             </Card.Header>
             <Card.Body>
               {Array.isArray(publicData?.latest_reports) && publicData.latest_reports.length > 0 ? (
@@ -256,7 +250,7 @@ const Dashboard = () => {
                     <div key={idx} className="list-group-item d-flex align-items-center justify-content-between">
                       <div className="d-flex align-items-center gap-3">
                         <div className="avatar-circle bg-primary text-white d-inline-flex align-items-center justify-content-center">
-                          <i className="bi bi-file-earmark-text"></i>
+                          {(r.title || 'R').charAt(0).toUpperCase()}
                         </div>
                         <div>
                           <div className="fw-semibold d-flex align-items-center gap-2">
@@ -314,7 +308,6 @@ const Dashboard = () => {
       <Row className="mb-4">
         <Col>
           <Alert variant="success" className="d-flex align-items-center">
-            <i className="bi bi-person-check-fill me-3 fs-4"></i>
             <div>
               <h5 className="mb-0">
                 Welcome back, {user?.firstName} {user?.lastName}!
@@ -333,7 +326,7 @@ const Dashboard = () => {
               <StatsCard
                 title="My Reports"
                 value={personalData?.personalStats?.my_reports || 0}
-                icon="bi-file-text"
+                
                 color="primary"
                 variant="hero"
               />
@@ -342,7 +335,7 @@ const Dashboard = () => {
               <StatsCard
                 title="Pending Reports"
                 value={personalData?.personalStats?.pending_reports || 0}
-                icon="bi-clock"
+                
                 color="warning"
                 variant="hero"
               />
@@ -351,7 +344,7 @@ const Dashboard = () => {
               <StatsCard
                 title="Enrolled Courses"
                 value={personalData?.personalStats?.enrolled_courses || 0}
-                icon="bi-book"
+                
                 color="info"
                 variant="hero"
               />
@@ -361,7 +354,7 @@ const Dashboard = () => {
                 title="Avg Rating Given"
                 value={personalData?.personalStats?.avg_class_rating ? 
                   parseFloat(personalData.personalStats.avg_class_rating).toFixed(1) : 'N/A'}
-                icon="bi-star"
+                
                 color="success"
                 variant="hero"
               />
@@ -373,7 +366,7 @@ const Dashboard = () => {
               <StatsCard
                 title="My Courses"
                 value={personalData?.personalStats?.my_courses || 0}
-                icon="bi-book"
+                
                 color="primary"
                 variant="hero"
               />
@@ -382,7 +375,7 @@ const Dashboard = () => {
               <StatsCard
                 title="My Reports"
                 value={personalData?.personalStats?.my_reports || 0}
-                icon="bi-file-text"
+                
                 color="info"
                 variant="hero"
               />
@@ -391,7 +384,7 @@ const Dashboard = () => {
               <StatsCard
                 title="Total Students"
                 value={personalData?.personalStats?.total_students || 0}
-                icon="bi-people"
+                
                 color="success"
                 variant="hero"
               />
@@ -401,7 +394,7 @@ const Dashboard = () => {
                 title="Avg Rating Received"
                 value={personalData?.personalStats?.avg_received_rating ? 
                   parseFloat(personalData.personalStats.avg_received_rating).toFixed(1) : 'N/A'}
-                icon="bi-star-fill"
+                
                 color="warning"
                 variant="hero"
               />
@@ -415,7 +408,7 @@ const Dashboard = () => {
         <Col md={12}>
           <Card>
             <Card.Header>
-              <h6 className="mb-0"><i className="bi bi-activity me-2"></i>My Activity (Recent)</h6>
+              <h6 className="mb-0">My Activity (Recent)</h6>
             </Card.Header>
             <Card.Body>
               <TrendsMiniChart
@@ -441,7 +434,7 @@ const Dashboard = () => {
           {user?.role === 'student' && (
             <Card className="mt-3">
               <Card.Header>
-                <h6 className="mb-0"><i className="bi bi-file-earmark-diff me-2"></i>My Drafts</h6>
+                <h6 className="mb-0">My Drafts</h6>
               </Card.Header>
               <Card.Body>
                 {Array.isArray(myDraftsData?.reports) && myDraftsData.reports.length > 0 ? (
@@ -469,7 +462,7 @@ const Dashboard = () => {
           {personalData?.pendingActions?.length > 0 && (
             <Card className="mt-3">
               <Card.Header>
-                <h6><i className="bi bi-exclamation-triangle me-2"></i>Pending Actions</h6>
+                <h6>Pending Actions</h6>
               </Card.Header>
               <Card.Body>
                 {personalData.pendingActions.map((action, index) => (
@@ -499,7 +492,7 @@ const Dashboard = () => {
           {personalData?.courses?.length > 0 && (
             <Card className="mt-3">
               <Card.Header>
-                <h6><i className="bi bi-book me-2"></i>My Courses</h6>
+                <h6>My Courses</h6>
               </Card.Header>
               <Card.Body>
                 {personalData.courses.map((course, index) => (
@@ -524,7 +517,6 @@ const Dashboard = () => {
     <Container fluid className="dashboard-container">
       <div className="dashboard-header mb-4">
         <h2>
-          <i className="bi bi-speedometer2 me-2"></i>
           {isAuthenticated ? 'Personal Dashboard' : 'Faculty Reporting Dashboard'}
         </h2>
         <p className="text-muted">

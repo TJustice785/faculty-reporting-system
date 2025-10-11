@@ -147,15 +147,26 @@ export default function Users() {
 
   const saveEdit = async (id) => {
     try {
-      const payload = {
-        username: editForm.username,
-        email: editForm.email,
-        firstName: editForm.firstName,
-        lastName: editForm.lastName,
-        // also send snake_case for backends that expect it
-        first_name: editForm.firstName,
-        last_name: editForm.lastName,
-      };
+      // Admin can update all fields, program_leader only names
+      let payload;
+      if (currentUser?.role === 'admin') {
+        payload = {
+          username: editForm.username,
+          email: editForm.email,
+          firstName: editForm.firstName,
+          lastName: editForm.lastName,
+          // also send snake_case for backends that expect it
+          first_name: editForm.firstName,
+          last_name: editForm.lastName,
+        };
+      } else {
+        payload = {
+          firstName: editForm.firstName,
+          lastName: editForm.lastName,
+          first_name: editForm.firstName,
+          last_name: editForm.lastName,
+        };
+      }
       await apiService.users.update(id, payload);
       toast.success('User updated');
       cancelEdit();
@@ -263,31 +274,54 @@ export default function Users() {
               {users.map((u) => (
                 <tr key={u.id}>
                   <td>
-                    <input type="checkbox"
-                           aria-label={`Select user ${u.id}`}
-                           checked={selected.includes(u.id)}
-                           onChange={e => toggleOne(u.id, e.target.checked)} />
+                    <input
+                      type="checkbox"
+                      aria-label={`Select user ${u.id}`}
+                      checked={selected.includes(u.id)}
+                      onChange={e => toggleOne(u.id, e.target.checked)}
+                    />
                   </td>
                   <td>{u.id}</td>
                   <td>
-                    {currentUser?.role === 'admin' && editId === u.id ? (
-                      <input className="form-control form-control-sm" value={editForm.username} onChange={e => setEditForm({ ...editForm, username: e.target.value })} />
+                    {editId === u.id && currentUser?.role === 'admin' ? (
+                      <input
+                        className="form-control form-control-sm"
+                        value={editForm.username}
+                        onChange={e => setEditForm({ ...editForm, username: e.target.value })}
+                      />
                     ) : (
                       u.username
                     )}
                   </td>
                   <td>
-                    {currentUser?.role === 'admin' && editId === u.id ? (
-                      <input type="email" className="form-control form-control-sm" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} />
+                    {editId === u.id && currentUser?.role === 'admin' ? (
+                      <input
+                        type="email"
+                        className="form-control form-control-sm"
+                        value={editForm.email}
+                        onChange={e => setEditForm({ ...editForm, email: e.target.value })}
+                      />
                     ) : (
                       u.email
                     )}
                   </td>
                   <td>
-                    {currentUser?.role === 'admin' && editId === u.id ? (
+                    {editId === u.id && (currentUser?.role === 'admin' || currentUser?.role === 'program_leader') ? (
                       <div className="d-flex gap-2">
-                        <input className="form-control form-control-sm" placeholder="First" style={{maxWidth: 140}} value={editForm.firstName} onChange={e => setEditForm({ ...editForm, firstName: e.target.value })} />
-                        <input className="form-control form-control-sm" placeholder="Last" style={{maxWidth: 140}} value={editForm.lastName} onChange={e => setEditForm({ ...editForm, lastName: e.target.value })} />
+                        <input
+                          className="form-control form-control-sm"
+                          placeholder="First"
+                          style={{ maxWidth: 140 }}
+                          value={editForm.firstName}
+                          onChange={e => setEditForm({ ...editForm, firstName: e.target.value })}
+                        />
+                        <input
+                          className="form-control form-control-sm"
+                          placeholder="Last"
+                          style={{ maxWidth: 140 }}
+                          value={editForm.lastName}
+                          onChange={e => setEditForm({ ...editForm, lastName: e.target.value })}
+                        />
                       </div>
                     ) : (
                       [u.firstName || u.first_name, u.lastName || u.last_name].filter(Boolean).join(' ')
@@ -298,6 +332,7 @@ export default function Users() {
                       className="form-select form-select-sm"
                       value={u.role}
                       onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                      disabled={currentUser?.role === 'program_leader' && (u.role !== 'student' && u.role !== 'lecturer')}
                     >
                       {roles.map(r => <option key={r} value={r}>{r}</option>)}
                       <option value="admin">admin</option>
@@ -312,7 +347,7 @@ export default function Users() {
                   </td>
                   <td>
                     <div className="d-flex gap-2">
-                      {currentUser?.role === 'admin' && (
+                      {((currentUser?.role === 'admin') || (currentUser?.role === 'program_leader' && (u.role === 'student' || u.role === 'lecturer'))) && (
                         editId === u.id ? (
                           <>
                             <button className="btn btn-sm btn-success" onClick={() => saveEdit(u.id)}>Save</button>

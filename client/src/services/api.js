@@ -154,6 +154,8 @@ export const apiService = {
     assignCourse: (id, courseData) => api.post(`/users/${id}/assign-course`, courseData),
     getAvailableCourses: (params) => api.get('/users/courses/available', { params }),
     getStreams: () => api.get('/users/streams/list'),
+    getPublicStreams: () => api.get('/users/public/streams'),
+    getPublicCourses: (params) => api.get('/users/public/courses', { params }),
     getLecturersByCourse: (courseId) => api.get('/users/lecturers/by-course', { params: { courseId } }),
     rateClass: (ratingData) => api.post('/users/rate-class', ratingData),
   },

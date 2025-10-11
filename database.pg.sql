@@ -70,6 +70,20 @@ BEGIN
     ALTER TABLE users ADD COLUMN updated_at TIMESTAMPTZ;
   END IF;
 
+  -- stream_id (faculty)
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='stream_id'
+  ) THEN
+    ALTER TABLE users ADD COLUMN stream_id INT;
+  END IF;
+
+  -- course_id
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='course_id'
+  ) THEN
+    ALTER TABLE users ADD COLUMN course_id INT;
+  END IF;
+
   -- drop old name column if present (optional, keep for compatibility)
   -- IF EXISTS (
   --   SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='name'
@@ -95,6 +109,24 @@ BEGIN
   ) THEN
     -- create a unique index and matching constraint name
     CREATE UNIQUE INDEX users_username_unique ON users(username) WHERE username IS NOT NULL;
+  END IF;
+END$$;
+
+-- Optionally add foreign keys if tables exist
+DO $$
+DECLARE
+  streams_exists BOOLEAN := EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='streams');
+  courses_exists BOOLEAN := EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='courses');
+BEGIN
+  IF streams_exists THEN
+    BEGIN
+      ALTER TABLE users ADD CONSTRAINT fk_users_streams FOREIGN KEY (stream_id) REFERENCES streams(id) ON DELETE SET NULL;
+    EXCEPTION WHEN duplicate_object THEN NULL; END;
+  END IF;
+  IF courses_exists THEN
+    BEGIN
+      ALTER TABLE users ADD CONSTRAINT fk_users_courses FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE SET NULL;
+    EXCEPTION WHEN duplicate_object THEN NULL; END;
   END IF;
 END$$;
 

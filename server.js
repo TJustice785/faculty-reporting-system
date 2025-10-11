@@ -12,7 +12,34 @@ const swaggerUi = require('swagger-ui-express');
 const YAML = require('yamljs');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
-require('dotenv').config({ override: true });
+// Load local .env only outside production to avoid overriding platform env vars
+if ((process.env.NODE_ENV || 'development') !== 'production') {
+  require('dotenv').config({ override: true });
+}
+
+// Initialize Express app and core middleware
+const app = express();
+const PORT = parseInt(process.env.PORT || 5000, 10);
+
+// Trust proxy if behind a reverse proxy (optional, safer for rate limiting)
+if (process.env.TRUST_PROXY === '1') {
+  app.set('trust proxy', 1);
+}
+
+// Security and performance middleware
+app.use(helmet());
+app.use(compression());
+app.use(cors({ origin: true, credentials: true }));
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true }));
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+
+// Basic rate limiting
+const limiter = rateLimit({ windowMs: 60 * 1000, max: 300 });
+app.use(limiter);
+
+// Static uploads (avatars, etc.)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Import route modules
 const authRoutes = require('./routes/auth');
@@ -23,104 +50,6 @@ const exportRoutes = require('./routes/export');
 const adminRoutes = require('./routes/admin');
 const notifications = require('./routes/notifications');
 
-const app = express();
-const PORT = process.env.PORT || 5003;
-// Nodemon restart trigger: env updated (CORS CLIENT_URL)
-
-// Security headers
-app.use(helmet());
-// Relax CSP to allow blob: images used by the app (keep other defaults safe)
-app.use(
-  helmet.contentSecurityPolicy({
-    useDefaults: true,
-    directives: {
-      // allow our assets and inline data URIs + blob images (e.g., canvas, exports)
-      imgSrc: ["'self'", 'data:', 'blob:'],
-      // allow blob: scripts (e.g., dynamically generated workers/bundles)
-      scriptSrc: [
-        "'self'",
-        'blob:',
-        // Preserve useful defaults we see in modern browsers
-        "'wasm-unsafe-eval'",
-        "'inline-speculation-rules'",
-      ],
-      // allow workers loaded from blob:
-      workerSrc: ["'self'", 'blob:'],
-    },
-  })
-);
-// Gzip compression for faster asset delivery
-app.use(compression());
-// Request logging (dev only)
-if ((process.env.NODE_ENV || 'development') !== 'production') {
-  app.use(morgan('dev'));
-}
-// Body parsers
-app.use(express.json({ limit: '2mb' }));
-app.use(express.urlencoded({ extended: true }));
-
-// If running behind a proxy (e.g., reverse proxy), trust it to get real client IP
-app.set('trust proxy', 1);
-
-  // CORS configuration — apply ONLY to API routes (avoid interfering with static assets)
-  const extraAllowed = (process.env.ALLOWED_ORIGINS || '')
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean);
-  const renderUrl = process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL || process.env.URL;
-
-  app.use('/api', cors({
-    origin: (origin, callback) => {
-      const isProd = (process.env.NODE_ENV || 'development') === 'production';
-      const baseAllowed = [process.env.CLIENT_URL, renderUrl, ...extraAllowed].filter(Boolean);
-      const devLocalhosts = [
-        // Common Vite/CRA dev ports
-        'http://localhost:3000',
-        'http://localhost:3001',
-        'http://127.0.0.1:3000',
-        'http://127.0.0.1:3001',
-        'http://localhost:5173',
-        'http://localhost:5174',
-        'http://localhost:5182',
-        'http://localhost:5178',
-        'http://localhost:5181',
-        'http://127.0.0.1:5173',
-        'http://127.0.0.1:5174',
-        'http://127.0.0.1:5182',
-        'http://127.0.0.1:5178',
-        'http://127.0.0.1:5181',
-      ];
-      const allowed = isProd ? baseAllowed : [...baseAllowed, ...devLocalhosts];
-      // Allow requests without Origin (e.g., curl, server-to-server)
-      if (!origin) return callback(null, true);
-      // Allow any onrender.com origins in production to support the deployed app domain
-      if (isProd && /\.onrender\.com$/i.test(new URL(origin).hostname)) {
-        return callback(null, true);
-      }
-      if (allowed.includes(origin)) return callback(null, true);
-      return callback(new Error('CORS not allowed'), false);
-    },
-    credentials: true,
-  }));
-
-// Rate limiting (protect sensitive routes)
-const RATE_LIMIT_MAX = parseInt(process.env.RATE_LIMIT_MAX || '100', 10);
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: RATE_LIMIT_MAX,
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-const exportLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: Math.max(20, Math.floor(RATE_LIMIT_MAX / 2)),
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-app.use('/api/auth', authLimiter);
-app.use('/api/export', exportLimiter);
-
-// Enhanced Database connection configuration (PostgreSQL only)
 const DB_CLIENT = 'postgres';
 const dbConfig = {
   host: process.env.DB_HOST || '127.0.0.1',
@@ -131,11 +60,17 @@ const dbConfig = {
   connectionLimit: 10,
 };
 
-console.log('🔧 Database Configuration:');
+const USING_DATABASE_URL = Boolean(process.env.DATABASE_URL);
+console.log('Database Configuration:');
 console.log(`   Client: ${DB_CLIENT}`);
-console.log(`   Host: ${dbConfig.host}:${dbConfig.port}`);
-console.log(`   Database: ${dbConfig.database}`);
-console.log(`   User: ${dbConfig.user}`);
+if (USING_DATABASE_URL) {
+  console.log('   Mode: DATABASE_URL (managed env)');
+} else {
+  console.log('   Mode: discrete env vars');
+  console.log(`   Host: ${dbConfig.host}:${dbConfig.port}`);
+  console.log(`   Database: ${dbConfig.database}`);
+  console.log(`   User: ${dbConfig.user}`);
+}
 
 function toPostgresPlaceholders(sql) {
   let idx = 0;
@@ -347,10 +282,10 @@ app.get('/api/health', async (req, res) => {
 });
 
 // Database connection test endpoint
-app.get('/api/db-test', async (req, res) => {
+app.get('/api/db-test', async (req, res, next) => {
   try {
     const connection = await db.getConnection();
-    
+      
     // Get database info
     let dbInfo = [];
     const [info] = await connection.execute(`
@@ -359,7 +294,7 @@ app.get('/api/db-test', async (req, res) => {
              version() as db_version
     `);
     dbInfo = info;
-    
+      
     // Get table count
     let tableCount; 
     const [tc] = await connection.execute(`
@@ -368,7 +303,7 @@ app.get('/api/db-test', async (req, res) => {
       WHERE table_schema NOT IN ('pg_catalog','information_schema')
     `);
     tableCount = tc;
-    
+      
     // Get user count (if users table exists)
     let userCount = 0;
     try {
@@ -377,9 +312,9 @@ app.get('/api/db-test', async (req, res) => {
     } catch (e) {
       // Table might not exist yet
     }
-    
+      
     connection.release();
-    
+      
     res.json({
       status: 'Connected',
       database: dbInfo[0]?.current_database,
@@ -389,63 +324,16 @@ app.get('/api/db-test', async (req, res) => {
       users: userCount,
       host: `${dbConfig.host}:${dbConfig.port}`
     });
-    
+      
   } catch (error) {
-    res.status(500).json({
-      status: 'Error',
-      error: error.message,
-      code: error.code
-    });
+    next(error);
   }
 });
 
-// Serve static files from React build (for production)
-if (process.env.NODE_ENV === 'production') {
-  // Guard: log if client build is missing to aid troubleshooting on platform deploys
-  const buildIndex = path.join(__dirname, 'client', 'build', 'index.html');
-  if (!fs.existsSync(buildIndex)) {
-    console.warn('⚠️  client/build/index.html not found. Ensure Build Command runs `npm run build` on the platform.');
-  }
-
-  // Cache static assets (immutable hashed files) aggressively
-  app.use('/assets', express.static(path.join(__dirname, 'client', 'build', 'assets'), {
-    maxAge: '1y',
-    immutable: true,
-  }));
-  // Serve remaining static files with moderate caching
-  app.use(express.static(path.join(__dirname, 'client/build')));
-  
-  // Serve favicon fallback to avoid 502s when /favicon.ico requested
-  app.get('/favicon.ico', (req, res) => {
-    try {
-      const buildDir = path.join(__dirname, 'client', 'build');
-      const svg = path.join(buildDir, 'favicon.svg');
-      const ico = path.join(buildDir, 'favicon.ico');
-
-      if (fs.existsSync(svg)) {
-        res.type('image/svg+xml');
-        return res.sendFile(svg);
-      }
-      if (fs.existsSync(ico)) {
-        res.type('image/x-icon');
-        return res.sendFile(ico);
-      }
-
-      // no favicon available — return no content so client won't retry
-      return res.status(204).end();
-    } catch (err) {
-      // don't crash the server if something goes wrong
-      console.error('favicon fallback error:', err);
-      return res.status(204).end();
-    }
-  });
-
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
-  });
-}
-
- 
+// 404 handler for API routes
+app.use('/api/*', (req, res) => {
+  res.status(404).json({ error: 'API endpoint not found' });
+});
 
 // Enhanced error handling middleware
 app.use((err, req, res, next) => {
@@ -469,12 +357,6 @@ app.use((err, req, res, next) => {
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
   });
 });
-
-// 404 handler for API routes
-app.use('/api/*', (req, res) => {
-  res.status(404).json({ error: 'API endpoint not found' });
-});
-
 async function startServer() {
   try {
     // Start listening first so frontend can reach API even if DB is down
@@ -485,12 +367,11 @@ async function startServer() {
       console.log(`🎯 API: http://localhost:${PORT}/api`);
       console.log(`📊 Health: http://localhost:${PORT}/api/health`);
       console.log(`🔍 DB Test: http://localhost:${PORT}/api/db-test`);
-      console.log(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log('=====================================\n');
       
       if (process.env.NODE_ENV === 'development') {
         console.log('💡 Development Tips:');
-        console.log('   - Frontend will run on http://localhost:5173');
+        console.log('   - Frontend will run on http://localhost:3000');
         console.log('   - Use pgAdmin/psql to manage database');
         console.log('   - Check /api/health for server status');
         console.log('   - Check /api/db-test for database info\n');

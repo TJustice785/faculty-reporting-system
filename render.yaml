@@ -8,8 +8,9 @@ services:
     env: node
     plan: free
     branch: main
-    buildCommand: "npm install && npm run build"
-    startCommand: "npm run start:server"
+    buildCommand: "npm install"
+    startCommand: "node server.js"
+    autoDeploy: true
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
@@ -23,7 +24,7 @@ static_sites:
     branch: main
     rootDir: client
     buildCommand: "npm install && npm run build"
-    publishDir: build
+    publishDir: dist
     envVars:
       - key: NODE_ENV
         value: production

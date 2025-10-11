@@ -129,7 +129,6 @@ const Navbar = () => {
                     onClick={handleNavClick}
                     className={`${isActive('/pending') ? 'active' : ''} my-1 my-lg-0`}
                   >
-                    <i className="bi bi-inbox me-1"></i>
                     Pending
                     {(pendingCountData?.count || 0) > 0 && (
                       <Badge bg="warning" text="dark" className="ms-1">{pendingCountData.count}</Badge>
@@ -145,7 +144,6 @@ const Navbar = () => {
                   onClick={handleNavClick}
                   className={`${isActive('/notifications') ? 'active' : ''} my-1 my-lg-0`}
                 >
-                  <i className="bi bi-bell me-1"></i>
                   Notifications
                   {unreadCount > 0 && (
                     <Badge bg="danger" className="ms-1">{unreadCount}</Badge>
@@ -215,27 +213,21 @@ const Navbar = () => {
                 {user?.role === 'lecturer' && (
                   <NavDropdown title="Lecturer" id="lecturer-dropdown">
                     <NavDropdown.Item as={Link} to="/reports" onClick={handleNavClick} active={isActive('/reports')}>
-                      <i className="bi bi-file-text me-2"></i>
                       Reports
                     </NavDropdown.Item>
                     <NavDropdown.Item as={Link} to="/lecturer/classes" onClick={handleNavClick} active={isActive('/lecturer/classes')}>
-                      <i className="bi bi-journal-text me-2"></i>
                       Classes
                     </NavDropdown.Item>
                     <NavDropdown.Item as={Link} to="/lecturer/monitoring" onClick={handleNavClick} active={isActive('/lecturer/monitoring')}>
-                      <i className="bi bi-activity me-2"></i>
                       Monitoring
                     </NavDropdown.Item>
                     <NavDropdown.Item as={Link} to="/lecturer/rating" onClick={handleNavClick} active={isActive('/lecturer/rating')}>
-                      <i className="bi bi-star-half me-2"></i>
                       Rating
                     </NavDropdown.Item>
                     <NavDropdown.Item as={Link} to="/reports/lecturer/new" onClick={handleNavClick}>
-                      <i className="bi bi-journal-plus me-2"></i>
                       New Lecturer Report
                     </NavDropdown.Item>
                     <NavDropdown.Item as={Link} to="/analytics" onClick={handleNavClick} active={isActive('/analytics')}>
-                      <i className="bi bi-graph-up me-2"></i>
                       Analytics
                     </NavDropdown.Item>
                   </NavDropdown>
@@ -245,23 +237,18 @@ const Navbar = () => {
                 {user?.role === 'principal_lecturer' && (
                   <NavDropdown title="PRL" id="prl-dropdown">
                     <NavDropdown.Item as={Link} to="/prl/courses" onClick={handleNavClick} active={isActive('/prl/courses')}>
-                      <i className="bi bi-journal-text me-2"></i>
                       Courses
                     </NavDropdown.Item>
                     <NavDropdown.Item as={Link} to="/reports" onClick={handleNavClick} active={isActive('/reports')}>
-                      <i className="bi bi-file-text me-2"></i>
                       Reports
                     </NavDropdown.Item>
                     <NavDropdown.Item as={Link} to="/prl/monitoring" onClick={handleNavClick} active={isActive('/prl/monitoring')}>
-                      <i className="bi bi-activity me-2"></i>
                       Monitoring
                     </NavDropdown.Item>
                     <NavDropdown.Item as={Link} to="/prl/rating" onClick={handleNavClick} active={isActive('/prl/rating')}>
-                      <i className="bi bi-star-half me-2"></i>
                       Rating
                     </NavDropdown.Item>
                     <NavDropdown.Item as={Link} to="/prl/classes" onClick={handleNavClick} active={isActive('/prl/classes')}>
-                      <i className="bi bi-collection me-2"></i>
                       Classes
                     </NavDropdown.Item>
                   </NavDropdown>
@@ -270,35 +257,27 @@ const Navbar = () => {
                 {user?.role === 'program_leader' && (
                   <NavDropdown title="PL" id="pl-dropdown">
                     <NavDropdown.Item as={Link} to="/pl/courses" onClick={handleNavClick} active={isActive('/pl/courses')}>
-                      <i className="bi bi-journal-text me-2"></i>
                       Courses
                     </NavDropdown.Item>
                     <NavDropdown.Item as={Link} to="/admin/assign-modules" onClick={handleNavClick} active={isActive('/admin/assign-modules')}>
-                      <i className="bi bi-diagram-3 me-2"></i>
                       Assign Modules
                     </NavDropdown.Item>
                     <NavDropdown.Item as={Link} to="/reports" onClick={handleNavClick} active={isActive('/reports')}>
-                      <i className="bi bi-file-text me-2"></i>
                       Reports
                     </NavDropdown.Item>
                     <NavDropdown.Item as={Link} to="/pl/monitoring" onClick={handleNavClick} active={isActive('/pl/monitoring')}>
-                      <i className="bi bi-activity me-2"></i>
                       Monitoring
                     </NavDropdown.Item>
                     <NavDropdown.Item as={Link} to="/pl/classes" onClick={handleNavClick} active={isActive('/pl/classes')}>
-                      <i className="bi bi-collection me-2"></i>
                       Classes
                     </NavDropdown.Item>
                     <NavDropdown.Item as={Link} to="/admin/assign-modules" onClick={handleNavClick} active={isActive('/admin/assign-modules')}>
-                      <i className="bi bi-clipboard-check me-2"></i>
                       Assign Classes
                     </NavDropdown.Item>
                     <NavDropdown.Item as={Link} to="/pl/lectures" onClick={handleNavClick} active={isActive('/pl/lectures')}>
-                      <i className="bi bi-people me-2"></i>
                       Lectures
                     </NavDropdown.Item>
                     <NavDropdown.Item as={Link} to="/pl/rating" onClick={handleNavClick} active={isActive('/pl/rating')}>
-                      <i className="bi bi-star-half me-2"></i>
                       Rating
                     </NavDropdown.Item>
                   </NavDropdown>
@@ -308,15 +287,12 @@ const Navbar = () => {
                 {user?.role === 'faculty_manager' && (
                   <NavDropdown title="Manager" id="fm-dropdown">
                     <NavDropdown.Item as={Link} to="/reports" onClick={handleNavClick} active={isActive('/reports')}>
-                      <i className="bi bi-file-text me-2"></i>
                       Reports
                     </NavDropdown.Item>
                     <NavDropdown.Item as={Link} to="/analytics" onClick={handleNavClick} active={isActive('/analytics')}>
-                      <i className="bi bi-graph-up me-2"></i>
                       Analytics
                     </NavDropdown.Item>
                     <NavDropdown.Item as={Link} to="/users" onClick={handleNavClick} active={isActive('/users')}>
-                      <i className="bi bi-people me-2"></i>
                       Users
                     </NavDropdown.Item>
                   </NavDropdown>
@@ -328,16 +304,13 @@ const Navbar = () => {
                   user?.role === 'admin') && (
                   <NavDropdown title="Admin Tools" id="admintools-dropdown">
                     <NavDropdown.Item as={Link} to="/analytics" onClick={handleNavClick} active={isActive('/analytics')}>
-                      <i className="bi bi-graph-up me-2"></i>
                       Analytics
                     </NavDropdown.Item>
                     <NavDropdown.Item as={Link} to="/users" onClick={handleNavClick} active={isActive('/users')}>
-                      <i className="bi bi-people me-2"></i>
                       User Management
                     </NavDropdown.Item>
                     {user?.role === 'admin' && (
                       <NavDropdown.Item as={Link} to="/admin/audit" onClick={handleNavClick} active={isActive('/admin/audit')}>
-                        <i className="bi bi-clipboard-data me-2"></i>
                         Audit Logs
                       </NavDropdown.Item>
                     )}
@@ -380,7 +353,7 @@ const Navbar = () => {
                         onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/default-avatar.svg'; }}
                       />
                     ) : (
-                      <i className="bi bi-person-circle me-1"></i>
+                      <span className="me-1" aria-hidden="true">•</span>
                     )}
                     {user?.firstName} {user?.lastName}
                     {user?.role && (
@@ -395,7 +368,6 @@ const Navbar = () => {
                 align="end"
               >
                 <NavDropdown.Item as={Link} to="/profile" onClick={handleNavClick}>
-                  <i className="bi bi-person me-2"></i>
                   Profile
                 </NavDropdown.Item>
                 {/* Admin Dashboard entry removed to keep a single dashboard at '/' */}
@@ -405,21 +377,18 @@ const Navbar = () => {
                     handleNavClick();
                   }}
                 >
-                  <i className="bi bi-plus-circle me-2"></i>
                   Create Report
                 </NavDropdown.Item>
                 {unreadCount > 0 && (
                   <>
                     <NavDropdown.Divider />
                     <NavDropdown.Item disabled>
-                      <i className="bi bi-bell me-2"></i>
                       {unreadCount} New Notification{unreadCount > 1 ? 's' : ''}
                     </NavDropdown.Item>
                   </>
                 )}
                 <NavDropdown.Divider />
                 <NavDropdown.Item onClick={handleLogout}>
-                  <i className="bi bi-box-arrow-right me-2"></i>
                   Logout
                 </NavDropdown.Item>
               </NavDropdown>

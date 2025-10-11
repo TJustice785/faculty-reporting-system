@@ -485,6 +485,25 @@ router.get('/personal', verifyToken, async (req, res) => {
         } catch (_) {
           dashboardData.courses = [];
         }
+        // Recent activity from student's enrolled courses (role-aligned content)
+        try {
+          const [courseActivity] = await req.db.execute(`
+            SELECT 
+              r.id, r.title, r.status, r.created_at,
+              c.course_name,
+              u.first_name, u.last_name, u.role as reporter_role
+            FROM student_enrollments se
+            JOIN reports r ON r.course_id = se.course_id
+            JOIN courses c ON c.id = se.course_id
+            JOIN users u ON u.id = r.reporter_id
+            WHERE se.student_id = ?
+            ORDER BY r.created_at DESC
+            LIMIT 5
+          `, [userId]);
+          dashboardData.courseActivity = courseActivity || [];
+        } catch (_) {
+          dashboardData.courseActivity = [];
+        }
         break;
 
       case 'lecturer':

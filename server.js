@@ -27,7 +27,39 @@ if (process.env.TRUST_PROXY === '1') {
 }
 
 // Security and performance middleware
-app.use(helmet());
+// Configure Helmet CSP to allow blob images (for file previews/avatars) while keeping defaults
+try {
+  const defaultDirectives = helmet.contentSecurityPolicy.getDefaultDirectives();
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        ...defaultDirectives,
+        // Allow images from data:, blob:, and https:
+        'img-src': ["'self'", 'data:', 'blob:', 'https:'],
+        // Allow scripts created from Blob URLs (e.g., web workers, dynamic chunks)
+        // Keep existing allowances like 'wasm-unsafe-eval' and 'inline-speculation-rules'
+        'script-src': [
+          "'self'",
+          "'wasm-unsafe-eval'",
+          "'inline-speculation-rules'",
+          'blob:'
+        ],
+        // Some browsers use script-src-elem for <script> tag sources; mirror script-src
+        'script-src-elem': [
+          "'self'",
+          "'wasm-unsafe-eval'",
+          "'inline-speculation-rules'",
+          'blob:'
+        ],
+        // Allow workers from blob: (used by bundlers for workers via Blob URLs)
+        'worker-src': ["'self'", 'blob:'],
+      }
+    }
+  }));
+} catch (e) {
+  // Fallback if helmet CSP is unavailable for any reason
+  app.use(helmet());
+}
 app.use(compression());
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '2mb' }));

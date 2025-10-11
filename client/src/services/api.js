@@ -157,6 +157,8 @@ export const apiService = {
     getPublicStreams: () => api.get('/users/public/streams'),
     getPublicCourses: (params) => api.get('/users/public/courses', { params }),
     getLecturersByCourse: (courseId) => api.get('/users/lecturers/by-course', { params: { courseId } }),
+    getRatingContext: (params) => api.get('/users/rating/context', { params }),
+    validateRateClass: (courseId, lecturerId) => api.get('/users/rate-class/validate', { params: { courseId, lecturerId } }),
     rateClass: (ratingData) => api.post('/users/rate-class', ratingData),
   },
 

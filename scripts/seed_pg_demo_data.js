@@ -11,7 +11,11 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env'), override: true });
 
 (async () => {
-  const cfg = {
+  const cfg = process.env.DATABASE_URL ? {
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.DATABASE_SSL === '1' ? { rejectUnauthorized: false } : undefined,
+    max: 1,
+  } : {
     host: process.env.DB_HOST || 'localhost',
     port: Number(process.env.DB_PORT || 5432),
     user: process.env.DB_USER || 'postgres',
@@ -19,6 +23,19 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env'), override: t
     database: process.env.DB_NAME || 'faculty-reporting-system1',
     max: 1,
   };
+
+  // Simple CLI args parsing: --students N --lecturers M
+  const args = process.argv.slice(2);
+  const getArg = (flag, def) => {
+    const idx = args.indexOf(flag);
+    if (idx !== -1 && args[idx + 1]) {
+      const n = parseInt(args[idx + 1], 10);
+      return Number.isFinite(n) ? n : def;
+    }
+    return def;
+  };
+  const EXTRA_STUDENTS = getArg('--students', 20);
+  const EXTRA_LECTURERS = getArg('--lecturers', 5);
 
   const pool = new Pool(cfg);
   const client = await pool.connect();
@@ -185,6 +202,8 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env'), override: t
       { name: 'Computer Science', code: 'CS' },
       { name: 'Information Technology', code: 'IT' },
       { name: 'Data Science', code: 'DS' },
+      { name: 'Business Information Systems', code: 'BIS' },
+      { name: 'Cybersecurity', code: 'SEC' },
     ];
     for (const s of streams) {
       const { rows } = await q(`SELECT id FROM streams WHERE stream_name = $1`, [s.name]);
@@ -202,9 +221,17 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env'), override: t
     // 3) Insert courses (adaptive to schema)
     const coursesSeed = [
       { name: 'Algorithms', code: 'CS101', stream: 'Computer Science' },
-      { name: 'Databases', code: 'CS102', stream: 'Computer Science' },
-      { name: 'Networks', code: 'IT201', stream: 'Information Technology' },
+      { name: 'Data Structures', code: 'CS102', stream: 'Computer Science' },
+      { name: 'Operating Systems', code: 'CS201', stream: 'Computer Science' },
+      { name: 'Databases', code: 'IT101', stream: 'Information Technology' },
+      { name: 'Computer Networks', code: 'IT201', stream: 'Information Technology' },
+      { name: 'Web Development', code: 'IT202', stream: 'Information Technology' },
       { name: 'Machine Learning', code: 'DS301', stream: 'Data Science' },
+      { name: 'Data Mining', code: 'DS302', stream: 'Data Science' },
+      { name: 'Business Analytics', code: 'BIS101', stream: 'Business Information Systems' },
+      { name: 'Information Systems', code: 'BIS201', stream: 'Business Information Systems' },
+      { name: 'Introduction to Cybersecurity', code: 'SEC101', stream: 'Cybersecurity' },
+      { name: 'Network Security', code: 'SEC201', stream: 'Cybersecurity' },
     ];
     const courseColumns = await getColumns('courses');
     const hasSemester = courseColumns.includes('semester');
@@ -225,18 +252,26 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env'), override: t
     const { rows: courseRows } = await q(`SELECT id, course_name, course_code FROM courses`);
 
     // 4) Ensure required roles/users exist
-    // Users table fields (from database.pg.sql adjustments): username, email, password_hash, role, first_name, last_name, phone, is_active
+    // Users table fields: adapt to existing schema. Some DBs have a NOT NULL "name" column.
     const bcrypt = require('bcryptjs');
     const hash = await bcrypt.hash('Password123', 10);
 
     const ensureUser = async (username, email, role, firstName, lastName) => {
+      const userColumns = await getColumns('users');
+      const hasName = userColumns.includes('name');
+      const nameValue = [firstName, lastName].filter(Boolean).join(' ').trim() || username;
       const existing = await q(`SELECT id FROM users WHERE username = $1 OR email = $2`, [username, email]);
       if (existing.rows.length > 0) return existing.rows[0].id;
+      // Build INSERT dynamically to include name if present
+      const cols = ['username','email','password_hash','role','first_name','last_name','is_active'];
+      const vals = [username, email, hash, role, firstName, lastName, true];
+      if (hasName) { cols.splice(3, 0, 'name'); vals.splice(3, 0, nameValue); }
+      const placeholders = vals.map((_, i) => `$${i + 1}`).join(', ');
       const ins = await q(`
-        INSERT INTO users (username, email, password_hash, role, first_name, last_name, is_active)
-        VALUES ($1, $2, $3, $4, $5, $6, TRUE)
+        INSERT INTO users (${cols.join(', ')})
+        VALUES (${placeholders})
         RETURNING id
-      `, [username, email, hash, role, firstName, lastName]);
+      `, vals);
       return ins.rows[0].id;
     };
 
@@ -246,57 +281,201 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env'), override: t
     const fmId = await ensureUser('fm1', 'fm1@example.com', 'faculty_manager', 'Derek', 'Manager');
     const adminId = await ensureUser('admin1', 'admin1@example.com', 'admin', 'Erin', 'Admin');
 
+    // Additional lecturers and students (idempotent)
+    // Generate additional lecturers: lecturer2..lecturer{EXTRA_LECTURERS+1}
+    const lecturerIds = [lecturerId];
+    for (let i = 2; i <= EXTRA_LECTURERS + 1; i++) {
+      const uname = `lecturer${i}`;
+      const email = `${uname}@example.com`;
+      const first = `Lecturer${i}`;
+      const last = 'Demo';
+      const id = await ensureUser(uname, email, 'lecturer', first, last);
+      lecturerIds.push(id);
+    }
+    // Generate additional students: student2..student{EXTRA_STUDENTS+1}
+    const studentIds = [studentId];
+    for (let i = 2; i <= EXTRA_STUDENTS + 1; i++) {
+      const uname = `student${i}`;
+      const email = `${uname}@example.com`;
+      const first = `Student${i}`;
+      const last = 'Demo';
+      const id = await ensureUser(uname, email, 'student', first, last);
+      studentIds.push(id);
+    }
+
     // 5) Map users to streams/courses
     // Assign program leader to the first stream
-    const firstStream = streamRows[0];
+    const firstStream = Array.isArray(streamRows) && streamRows.length > 0 ? streamRows[0] : null;
     if (firstStream) {
       const { rows: us } = await q(`SELECT 1 FROM user_streams WHERE user_id = $1 AND stream_id = $2`, [plId, firstStream.id]);
-      if (us.length === 0) {
+      if (us.rows ? us.rows.length === 0 : us.length === 0) {
         await q(`INSERT INTO user_streams (user_id, stream_id) VALUES ($1, $2)`, [plId, firstStream.id]);
       }
     }
 
-    // Assign lecturer to first course, enroll student to first two courses
-    const firstCourse = courseRows[0];
-    const secondCourse = courseRows[1];
+    // Assign first lecturer to first course, enroll first student to first two courses
+    const firstCourse = Array.isArray(courseRows) && courseRows.length > 0 ? courseRows[0] : null;
+    const secondCourse = Array.isArray(courseRows) && courseRows.length > 1 ? courseRows[1] : null;
     if (firstCourse) {
+      // Detect optional columns
+      const lcCols = await getColumns('lecturer_courses');
+      const seCols = await getColumns('student_enrollments');
+      const hasLcAY = lcCols.includes('academic_year');
+      const hasLcSem = lcCols.includes('semester');
+      const hasSeAY = seCols.includes('academic_year');
+      const hasSeSem = seCols.includes('semester');
+
       let r;
       r = await q(`SELECT 1 FROM lecturer_courses WHERE lecturer_id = $1 AND course_id = $2`, [lecturerId, firstCourse.id]);
-      if (r.rows.length === 0) {
-        await q(`INSERT INTO lecturer_courses (lecturer_id, course_id) VALUES ($1, $2)`, [lecturerId, firstCourse.id]);
+      if ((r.rows || []).length === 0) {
+        const columns = ['lecturer_id','course_id'];
+        const values = [lecturerId, firstCourse.id];
+        if (hasLcAY) { columns.push('academic_year'); values.push('2024/2025'); }
+        if (hasLcSem) { columns.push('semester'); values.push(1); }
+        const ph = values.map((_, i) => `$${i+1}`).join(', ');
+        await q(`INSERT INTO lecturer_courses (${columns.join(', ')}) VALUES (${ph})`, values);
       }
       r = await q(`SELECT 1 FROM student_enrollments WHERE student_id = $1 AND course_id = $2`, [studentId, firstCourse.id]);
-      if (r.rows.length === 0) {
-        await q(`INSERT INTO student_enrollments (student_id, course_id) VALUES ($1, $2)`, [studentId, firstCourse.id]);
+      if ((r.rows || []).length === 0) {
+        const columns = ['student_id','course_id'];
+        const values = [studentId, firstCourse.id];
+        if (hasSeAY) { columns.push('academic_year'); values.push('2024/2025'); }
+        if (hasSeSem) { columns.push('semester'); values.push(1); }
+        const ph = values.map((_, i) => `$${i+1}`).join(', ');
+        await q(`INSERT INTO student_enrollments (${columns.join(', ')}) VALUES (${ph})`, values);
       }
     }
     if (secondCourse) {
+      const seCols = await getColumns('student_enrollments');
+      const hasSeAY = seCols.includes('academic_year');
+      const hasSeSem = seCols.includes('semester');
       const r2 = await q(`SELECT 1 FROM student_enrollments WHERE student_id = $1 AND course_id = $2`, [studentId, secondCourse.id]);
       if (r2.rows.length === 0) {
-        await q(`INSERT INTO student_enrollments (student_id, course_id) VALUES ($1, $2)`, [studentId, secondCourse.id]);
+        const columns = ['student_id','course_id'];
+        const values = [studentId, secondCourse.id];
+        if (hasSeAY) { columns.push('academic_year'); values.push('2024/2025'); }
+        if (hasSeSem) { columns.push('semester'); values.push(1); }
+        const ph = values.map((_, i) => `$${i+1}`).join(', ');
+        await q(`INSERT INTO student_enrollments (${columns.join(', ')}) VALUES (${ph})`, values);
       }
     }
 
-    // 6) Insert sample reports
+    // Map additional lecturers and students to courses
+    if (Array.isArray(courseRows) && courseRows.length > 0) {
+      const mapCourses = courseRows.slice(0, Math.min(courseRows.length, 4));
+      // Each lecturer teaches one of the first 4 courses in round-robin
+      const lcColsMap = await getColumns('lecturer_courses');
+      const hasLcAYMap = lcColsMap.includes('academic_year');
+      const hasLcSemMap = lcColsMap.includes('semester');
+      for (let i = 0; i < lecturerIds.length; i++) {
+        const lecId = lecturerIds[i];
+        const course = mapCourses[i % mapCourses.length];
+        const { rows: existL } = await q(`SELECT 1 FROM lecturer_courses WHERE lecturer_id = $1 AND course_id = $2`, [lecId, course.id]);
+        if (existL.length === 0) {
+          const columns = ['lecturer_id','course_id'];
+          const values = [lecId, course.id];
+          if (hasLcAYMap) { columns.push('academic_year'); values.push('2024/2025'); }
+          if (hasLcSemMap) { columns.push('semester'); values.push(1); }
+          const ph = values.map((_, i) => `$${i+1}`).join(', ');
+          await q(`INSERT INTO lecturer_courses (${columns.join(', ')}) VALUES (${ph})`, values);
+        }
+      }
+      // Enroll students across first two courses in round-robin
+      const enrollCourses = courseRows.slice(0, Math.min(courseRows.length, 2));
+      const seColsMap = await getColumns('student_enrollments');
+      const hasSeAYMap = seColsMap.includes('academic_year');
+      const hasSeSemMap = seColsMap.includes('semester');
+      for (const sid of studentIds) {
+        for (const c of enrollCourses) {
+          const { rows: existE } = await q(`SELECT 1 FROM student_enrollments WHERE student_id = $1 AND course_id = $2`, [sid, c.id]);
+          if (existE.length === 0) {
+            const columns = ['student_id','course_id'];
+            const values = [sid, c.id];
+            if (hasSeAYMap) { columns.push('academic_year'); values.push('2024/2025'); }
+            if (hasSeSemMap) { columns.push('semester'); values.push(1); }
+            const ph = values.map((_, i) => `$${i+1}`).join(', ');
+            await q(`INSERT INTO student_enrollments (${columns.join(', ')}) VALUES (${ph})`, values);
+          }
+        }
+      }
+    }
+
+    // 6) Seed lecturer-to-lecturer peer ratings (each lecturer rates every other)
+    if (Array.isArray(lecturerIds) && lecturerIds.length > 1) {
+      for (let i = 0; i < lecturerIds.length; i++) {
+        for (let j = 0; j < lecturerIds.length; j++) {
+          const rater = lecturerIds[i];
+          const rated = lecturerIds[j];
+          if (rater === rated) continue; // no self-rating
+          const { rows: existsPR } = await q(
+            `SELECT 1 FROM peer_ratings WHERE rater_lecturer_id = $1 AND rated_lecturer_id = $2`,
+            [rater, rated]
+          );
+          if (existsPR.length === 0) {
+            // Deterministic rating between 3 and 5 for repeatability
+            const base = (rater + rated) % 3; // 0..2
+            const rating = 3 + base; // 3..5
+            const comment = `Peer review from ${rater} to ${rated}`;
+            await q(
+              `INSERT INTO peer_ratings (rater_lecturer_id, rated_lecturer_id, rating, comments) VALUES ($1, $2, $3, $4)`,
+              [rater, rated, rating, comment]
+            );
+          }
+        }
+      }
+    }
+
+    // 7) Insert sample reports
     const now = new Date();
     const statusList = ['draft','submitted','approved','rejected'];
 
-    for (let i = 0; i < Math.min(courseRows.length, 3); i++) {
+    // Avoid duplicate sample reports by checking title per user
+    const ensureReport = async (userId, courseId, title, content, status) => {
+      const repCols = await getColumns('reports');
+      const hasUserId = repCols.includes('user_id');
+      const colsCheck = hasUserId ? ['user_id','title'] : ['title'];
+      const paramsCheck = hasUserId ? [userId, title] : [title];
+      const where = hasUserId ? 'user_id = $1 AND title = $2' : 'title = $1';
+      const { rows } = await q(`SELECT 1 FROM reports WHERE ${where}`, paramsCheck);
+      if (rows.length === 0) {
+        const cols = ['reporter_id','course_id','title','content','status'];
+        const vals = [userId, courseId, title, content, status];
+        if (hasUserId) { cols.unshift('user_id'); vals.unshift(userId); }
+        const ph = vals.map((_, i) => `$${i+1}`).join(', ');
+        await q(`INSERT INTO reports (${cols.join(', ')}) VALUES (${ph})`, vals);
+      }
+    };
+
+    for (let i = 0; i < Math.min(courseRows.length, 5); i++) {
       const c = courseRows[i];
       const status = statusList[i % statusList.length];
-      await q(`
-        INSERT INTO reports (user_id, reporter_id, course_id, title, content, status, created_at)
-        VALUES ($1, $1, $2, $3, $4, $5, NOW())
-      `, [studentId, c.id, `Weekly Report ${i + 1}`, `Progress on ${c.course_name}`, status]);
+      await ensureReport(studentId, c.id, `Weekly Report ${i + 1}`, `Progress on ${c.course_name}`, status);
     }
 
-    // 7) Insert some ratings for the lecturer
+    // Add one report for each of first 3 students across first 2 courses
+    const miniStudents = studentIds.slice(0, 3);
+    const miniCourses = courseRows.slice(0, 2);
+    for (const sid of miniStudents) {
+      for (const c of miniCourses) {
+        await ensureReport(sid, c.id, `Intro Report ${sid}-${c.id}`, `Getting started with ${c.course_name}`, 'submitted');
+      }
+    }
+
+    // 8) Insert some student->lecturer class ratings
     if (firstCourse) {
-      await q(`INSERT INTO class_ratings (student_id, lecturer_id, course_id, rating) VALUES ($1, $2, $3, 5)`, [studentId, lecturerId, firstCourse.id]);
-      await q(`INSERT INTO class_ratings (student_id, lecturer_id, course_id, rating) VALUES ($1, $2, $3, 4)`, [studentId, lecturerId, firstCourse.id]);
+      const crCols = await getColumns('class_ratings');
+      const hasClassDate = crCols.includes('class_date');
+      const cols = ['student_id','lecturer_id','course_id','rating'];
+      const vals1 = [studentId, lecturerId, firstCourse.id, 5];
+      const vals2 = [studentId, lecturerId, firstCourse.id, 4];
+      if (hasClassDate) { cols.push('class_date'); vals1.push(new Date()); vals2.push(new Date()); }
+      const ph1 = vals1.map((_, i) => `$${i+1}`).join(', ');
+      const ph2 = vals2.map((_, i) => `$${i+1}`).join(', ');
+      await q(`INSERT INTO class_ratings (${cols.join(', ')}) VALUES (${ph1})`, vals1);
+      await q(`INSERT INTO class_ratings (${cols.join(', ')}) VALUES (${ph2})`, vals2);
     }
 
-    // 8) Progress tracking for the student
+    // 9) Progress tracking for the student
     if (firstCourse) {
       await q(`INSERT INTO progress_tracking (student_id, course_id, completion_percentage) VALUES ($1, $2, 60)`, [studentId, firstCourse.id]);
     }

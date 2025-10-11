@@ -15,19 +15,26 @@ export default function StudentClasses() {
     try {
       setLoading(true);
       setError('');
-      const { data } = await apiService.dashboard.getPersonal();
-      let list = data?.courses || [];
-      if (!Array.isArray(list) || list.length === 0) {
+      // Prefer unified context to get courses with lecturers grouped
+      let list = [];
+      try {
+        const ctx = await apiService.users.getRatingContext();
+        list = Array.isArray(ctx.data?.courses) ? ctx.data.courses : [];
+      } catch (_) {
+        // Fallbacks in case context is unavailable
         try {
           const alt = await apiService.users.getAvailableCourses();
           list = Array.isArray(alt.data?.courses) ? alt.data.courses : (Array.isArray(alt.data) ? alt.data : []);
         } catch (_) { /* ignore */ }
       }
+      // Normalize minimal fields expected by table; retain lecturers if present
       const normalized = (list || []).map(c => ({
         id: c.id ?? c.course_id ?? c.courseId,
         course_name: c.course_name ?? c.name ?? c.title ?? 'Untitled',
         course_code: c.course_code ?? c.code ?? '',
         stream_name: c.stream_name ?? c.stream ?? '',
+        semester: c.semester,
+        lecturers: Array.isArray(c.lecturers) ? c.lecturers : [],
         student_count: c.student_count ?? c.students ?? undefined,
         my_rating: c.my_rating ?? c.rating ?? undefined,
       })).filter(c => c.id != null);
@@ -47,6 +54,16 @@ export default function StudentClasses() {
     if (!ratingFor) return;
     if (!lecturerId) { toast.error('Please select a lecturer'); return; }
     try {
+      // Validate eligibility before submit (better UX)
+      try {
+        const { data: v } = await apiService.users.validateRateClass(ratingFor.id, lecturerId);
+        if (!v?.ok) {
+          toast.error(v?.error || 'You cannot rate this lecturer for this course');
+          return;
+        }
+      } catch (ve) {
+        // If validation endpoint fails, proceed to server-side validation on submit
+      }
       await apiService.users.rateClass({
         courseId: ratingFor.id,
         rating: Number(rating),
@@ -64,27 +81,23 @@ export default function StudentClasses() {
     }
   };
 
-  // Load lecturers for course when opening rating modal
+  // Load lecturers for course when opening rating modal (use context if available; fallback to API)
   useEffect(() => {
-    const fetchLecturers = async () => {
+    const updateLecturers = async () => {
       if (!ratingFor?.id) { setLecturers([]); return; }
+      if (Array.isArray(ratingFor.lecturers) && ratingFor.lecturers.length > 0) {
+        setLecturers(ratingFor.lecturers);
+        return;
+      }
       try {
         const { data } = await apiService.users.getLecturersByCourse(ratingFor.id);
         const list = Array.isArray(data?.lecturers) ? data.lecturers : [];
-        // De-duplicate by id to avoid duplicate keys
         const seen = new Set();
-        const deduped = list.filter(l => {
-          const key = l.id;
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        });
+        const deduped = list.filter(l => { const k = l.id; if (seen.has(k)) return false; seen.add(k); return true; });
         setLecturers(deduped);
-      } catch (_) {
-        setLecturers([]);
-      }
+      } catch (_) { setLecturers([]); }
     };
-    fetchLecturers();
+    updateLecturers();
   }, [ratingFor]);
 
   if (loading) return <div className="container py-4"><Spinner /></div>;

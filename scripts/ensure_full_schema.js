@@ -125,6 +125,17 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env'), override: t
       created_at TIMESTAMPTZ DEFAULT NOW()
     );`);
 
+    // Lecturer-to-lecturer peer ratings
+    await q(`CREATE TABLE IF NOT EXISTS peer_ratings (
+      id SERIAL PRIMARY KEY,
+      rater_lecturer_id INT NOT NULL,
+      rated_lecturer_id INT NOT NULL,
+      rating INT CHECK (rating BETWEEN 1 AND 5) NOT NULL,
+      comments TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE (rater_lecturer_id, rated_lecturer_id)
+    );`);
+
     await q(`CREATE TABLE IF NOT EXISTS feedback (
       id SERIAL PRIMARY KEY,
       report_id INT,

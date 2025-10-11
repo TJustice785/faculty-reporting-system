@@ -62,6 +62,132 @@ router.post('/:id/reset-password', verifyToken, authorize('admin'), async (req, 
   }
 });
 
+router.get('/rating/context', verifyToken, async (req, res) => {
+  try {
+    const { stream_id, all } = req.query;
+    const userId = req.user.id;
+    const role = req.user.role;
+
+    let courses = [];
+
+    if (String(all).toLowerCase() === 'true') {
+      let sql = `
+        SELECT 
+          c.id, c.course_name, c.course_code, c.credits, c.semester,
+          s.stream_name, s.stream_code
+        FROM courses c
+        JOIN streams s ON c.stream_id = s.id`;
+      const params = [];
+      if (stream_id) { sql += ' WHERE c.stream_id = ?'; params.push(stream_id); }
+      sql += ' ORDER BY s.stream_name, c.semester, c.course_name';
+      const [rows] = await req.db.execute(sql, params);
+      courses = rows;
+    } else if (role === 'student') {
+      let sql = `
+        SELECT 
+          c.id, c.course_name, c.course_code, c.credits, c.semester,
+          s.stream_name, s.stream_code
+        FROM student_enrollments se
+        JOIN courses c ON se.course_id = c.id
+        JOIN streams s ON c.stream_id = s.id
+        WHERE se.student_id = ?`;
+      const params = [userId];
+      if (stream_id) { sql += ' AND c.stream_id = ?'; params.push(stream_id); }
+      sql += ' ORDER BY s.stream_name, c.semester, c.course_name';
+      const [rows] = await req.db.execute(sql, params);
+      courses = rows;
+    } else {
+      let sql = `
+        SELECT 
+          c.id, c.course_name, c.course_code, c.credits, c.semester,
+          s.stream_name, s.stream_code
+        FROM lecturer_courses lc
+        JOIN courses c ON lc.course_id = c.id
+        JOIN streams s ON c.stream_id = s.id
+        WHERE lc.lecturer_id = ?`;
+      const params = [userId];
+      if (stream_id) { sql += ' AND c.stream_id = ?'; params.push(stream_id); }
+      sql += ' ORDER BY s.stream_name, c.semester, c.course_name';
+      const [rows] = await req.db.execute(sql, params);
+      if (rows && rows.length > 0) {
+        courses = rows;
+      } else {
+        let allSql = `
+          SELECT 
+            c.id, c.course_name, c.course_code, c.credits, c.semester,
+            s.stream_name, s.stream_code
+          FROM courses c
+          JOIN streams s ON c.stream_id = s.id`;
+        const allParams = [];
+        if (stream_id) { allSql += ' WHERE c.stream_id = ?'; allParams.push(stream_id); }
+        allSql += ' ORDER BY s.stream_name, c.semester, c.course_name';
+        const [allRows] = await req.db.execute(allSql, allParams);
+        courses = allRows;
+      }
+    }
+
+    const courseIds = courses.map(c => c.id);
+    let lecturersByCourse = new Map();
+    if (courseIds.length > 0) {
+      const placeholders = courseIds.map(() => '?').join(',');
+      const [lecRows] = await req.db.execute(
+        `SELECT lc.course_id, u.id, u.first_name, u.last_name, u.email
+         FROM lecturer_courses lc
+         JOIN users u ON u.id = lc.lecturer_id
+         WHERE lc.course_id IN (${placeholders})`,
+        courseIds
+      );
+      lecturersByCourse = lecRows.reduce((acc, r) => {
+        const list = acc.get(r.course_id) || [];
+        list.push({ id: r.id, first_name: r.first_name, last_name: r.last_name, email: r.email });
+        acc.set(r.course_id, list);
+        return acc;
+      }, new Map());
+    }
+
+    const data = courses.map(c => ({
+      ...c,
+      lecturers: lecturersByCourse.get(c.id) || []
+    }));
+
+    res.json({ courses: data });
+  } catch (error) {
+    console.error('Rating context error:', error);
+    res.status(500).json({ error: 'Failed to fetch rating context' });
+  }
+});
+
+router.get('/rate-class/validate', verifyToken, async (req, res) => {
+  try {
+    const { courseId, lecturerId } = req.query;
+    if (!courseId || !lecturerId) {
+      return res.status(400).json({ ok: false, error: 'courseId and lecturerId are required' });
+    }
+    const userId = req.user.id;
+
+    const [enrollment] = await req.db.execute(
+      'SELECT 1 FROM student_enrollments WHERE student_id = ? AND course_id = ?',
+      [userId, courseId]
+    );
+    if (enrollment.length === 0) {
+      return res.status(200).json({ ok: false, error: 'You are not enrolled in this course' });
+    }
+
+    const [lecturerCourse] = await req.db.execute(
+      'SELECT 1 FROM lecturer_courses WHERE lecturer_id = ? AND course_id = ?',
+      [lecturerId, courseId]
+    );
+    if (lecturerCourse.length === 0) {
+      return res.status(200).json({ ok: false, error: 'Selected lecturer does not teach this course' });
+    }
+
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error('Rate-class validate error:', error);
+    res.status(500).json({ ok: false, error: 'Validation failed' });
+  }
+});
+
 // Public endpoints for registration: list streams and courses without auth
 // GET /api/users/public/streams - list all streams (faculties)
 router.get('/public/streams', async (req, res) => {

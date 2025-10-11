@@ -435,8 +435,6 @@ router.post('/notifications/mark-all-read', verifyToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to mark all notifications as read' });
   }
 });
-
-// GET /api/dashboard/personal - Personal dashboard data (requires login)
 router.get('/personal', verifyToken, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -504,6 +502,26 @@ router.get('/personal', verifyToken, async (req, res) => {
         } catch (_) {
           dashboardData.courseActivity = [];
         }
+
+        // If no enrollments, suggest popular/public courses as onboarding help
+        try {
+          const enrolledCount = Number(dashboardData?.personalStats?.enrolled_courses || 0);
+          if (enrolledCount === 0) {
+            const [suggestions] = await req.db.execute(`
+              SELECT 
+                c.id, c.course_name, c.course_code,
+                s.stream_name,
+                COUNT(DISTINCT se.student_id) as enrolled_students
+              FROM courses c
+              JOIN streams s ON c.stream_id = s.id
+              LEFT JOIN student_enrollments se ON se.course_id = c.id
+              GROUP BY c.id, s.stream_name
+              ORDER BY enrolled_students DESC NULLS LAST, c.course_name ASC
+              LIMIT 5
+            `);
+            dashboardData.suggestedCourses = suggestions || [];
+          }
+        } catch (_) { /* ignore suggestions */ }
         break;
 
       case 'lecturer':
@@ -524,6 +542,19 @@ router.get('/personal', verifyToken, async (req, res) => {
         } catch (_) {
           dashboardData.personalStats = {};
         }
+        // Peer ratings summary for lecturers (from peer_ratings)
+        try {
+          const [peer] = await req.db.execute(`
+            SELECT AVG(rating)::numeric(10,2) as peer_avg_received, COUNT(*)::int as peer_ratings_count
+            FROM peer_ratings
+            WHERE rated_lecturer_id = ?
+          `, [userId]);
+          dashboardData.personalStats = {
+            ...dashboardData.personalStats,
+            peer_avg_received: peer?.[0]?.peer_avg_received || null,
+            peer_ratings_count: peer?.[0]?.peer_ratings_count || 0,
+          };
+        } catch (_) { /* ignore if table missing */ }
         try {
           const [lecturerCourses] = await req.db.execute(`
             SELECT 
@@ -759,6 +790,61 @@ router.get('/personal', verifyToken, async (req, res) => {
     } catch (_) {
       dashboardData.recentReports = [];
     }
+
+    // Notifications preview (latest few of any type relevant to the user)
+    try {
+      // Feedback to user
+      const [fb] = await req.db.execute(`
+        SELECT 'feedback' as type, f.id, f.created_at,
+               CONCAT(u.first_name,' ',u.last_name) AS from_name,
+               LEFT(f.feedback_content, 80) AS message
+        FROM feedback f
+        JOIN users u ON u.id = f.feedback_from_id
+        WHERE f.feedback_to_id = ?
+        ORDER BY f.created_at DESC
+        LIMIT 3
+      `, [userId]);
+      // System notifications
+      const [sys] = await req.db.execute(`
+        SELECT 'system' as type, n.id, n.created_at,
+               COALESCE(n.title,'System Update') AS title,
+               LEFT(COALESCE(n.message,''), 80) AS message
+        FROM notifications n
+        WHERE n.user_id = ? AND n.type = 'system'
+        ORDER BY n.created_at DESC
+        LIMIT 3
+      `, [userId]);
+      // Role-based new reports preview (limited)
+      let roleSql = null; let params = [];
+      if (req.user.role === 'lecturer') {
+        roleSql = `
+          SELECT 'new_report' as type, r.id, r.created_at, r.title,
+                 CONCAT(u.first_name,' ',u.last_name) AS from_name
+          FROM reports r
+          JOIN users u ON r.reporter_id = u.id
+          WHERE r.status='submitted' AND u.role='student' AND r.course_id IN (
+            SELECT course_id FROM lecturer_courses WHERE lecturer_id = ?
+          )
+          ORDER BY r.created_at DESC LIMIT 3`;
+        params = [userId];
+      } else if (['program_leader','principal_lecturer','faculty_manager'].includes(req.user.role)) {
+        roleSql = `
+          SELECT 'new_report' as type, r.id, r.created_at, r.title,
+                 CONCAT(u.first_name,' ',u.last_name) AS from_name
+          FROM reports r
+          JOIN users u ON r.reporter_id = u.id
+          WHERE r.status='submitted'
+          ORDER BY r.created_at DESC LIMIT 3`;
+      }
+      let nr = [];
+      if (roleSql) {
+        const [rows] = await req.db.execute(roleSql, params);
+        nr = rows || [];
+      }
+      dashboardData.notificationsPreview = [...(fb||[]), ...(sys||[]), ...nr]
+        .sort((a,b)=> new Date(b.created_at)-new Date(a.created_at))
+        .slice(0,5);
+    } catch (_) { /* ignore preview errors */ }
 
     res.json(dashboardData);
 

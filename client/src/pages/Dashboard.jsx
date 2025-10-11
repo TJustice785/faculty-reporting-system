@@ -27,6 +27,17 @@ const Dashboard = () => {
     }
   );
 
+  // Managerial analytics (PL/PRL/FM/Admin) KPI tiles
+  const isManagerial = isAuthenticated && ['program_leader','principal_lecturer','faculty_manager','admin'].includes(user?.role);
+  const { data: analyticsData } = useQuery(
+    ['dashboard-analytics', user?.role],
+    async () => {
+      const res = await apiService.dashboard.getAnalytics(30);
+      return res?.data ?? res;
+    },
+    { enabled: isManagerial }
+  );
+
   // Student: fetch top 5 drafts for quick access
   const { data: myDraftsData } = useQuery(
     ['reports-drafts', user?.id],
@@ -63,6 +74,8 @@ const Dashboard = () => {
             </Alert>
           </Col>
         </Row>
+
+      
       )}
       <Row className="mb-4">
         <Col>
@@ -421,6 +434,42 @@ const Dashboard = () => {
               variant="default"
             />
           </Col>
+        </Row>
+      )}
+
+      {/* Analytics KPI tiles for managerial roles */}
+      {isManagerial && analyticsData && (
+        <Row className="mb-4">
+          {(() => {
+            const reportTrends = Array.isArray(analyticsData.reportTrends) ? analyticsData.reportTrends : [];
+            const streamPerformance = Array.isArray(analyticsData.streamPerformance) ? analyticsData.streamPerformance : [];
+            const coursePopularity = Array.isArray(analyticsData.coursePopularity) ? analyticsData.coursePopularity : [];
+            const totalReports30 = reportTrends.reduce((sum, r) => sum + Number(r.report_count || 0), 0);
+            const approved30 = reportTrends.reduce((sum, r) => sum + Number(r.approved_count || 0), 0);
+            const approvedPct = totalReports30 > 0 ? Math.round((approved30 / totalReports30) * 100) : 0;
+            const topStream = streamPerformance
+              .map(s => ({ name: s.stream_name, avg: parseFloat(s.avg_rating || 0) }))
+              .sort((a,b) => (b.avg || 0) - (a.avg || 0))[0];
+            const topCourse = coursePopularity
+              .map(c => ({ name: c.course_name, students: Number(c.enrolled_students || 0) }))
+              .sort((a,b) => b.students - a.students)[0];
+            return (
+              <>
+                <Col md={3} className="mb-3">
+                  <StatsCard title="Reports (30d)" value={totalReports30} color="primary" variant="hero" />
+                </Col>
+                <Col md={3} className="mb-3">
+                  <StatsCard title="Approved % (30d)" value={`${approvedPct}%`} color="success" variant="hero" />
+                </Col>
+                <Col md={3} className="mb-3">
+                  <StatsCard title="Top Stream Avg" value={topStream ? `${topStream.avg.toFixed(1)} ⭐` : 'N/A'} color="info" variant="hero" />
+                </Col>
+                <Col md={3} className="mb-3">
+                  <StatsCard title="Top Course Enrolls" value={topCourse ? `${topCourse.students}` : '0'} color="warning" variant="hero" />
+                </Col>
+              </>
+            );
+          })()}
         </Row>
       )}
 

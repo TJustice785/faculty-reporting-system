@@ -37,34 +37,7 @@ const Register = () => {
     }
   }, [isAuthenticated, isLoading, navigate]);
 
-  // Load streams and optionally courses
-  const loadStreams = async () => {
-    try {
-      const { data } = await apiService.users.getPublicStreams();
-      setStreams(data?.streams || []);
-    } catch (_) {
-      setStreams([]);
-    }
-  };
-
-  const loadCourses = async (streamId) => {
-    try {
-      const { data } = await apiService.users.getPublicCourses({ stream_id: streamId });
-      setCourses(data?.courses || []);
-    } catch (_) {
-      setCourses([]);
-    }
-  };
-
-  useEffect(() => {
-    loadStreams();
-  }, []);
-
-  useEffect(() => {
-    if (formData.streamId) {
-      loadCourses(formData.streamId);
-    }
-  }, [formData.streamId]);
+  // Faculty/Course fetching disabled (optional fields). Leave arrays empty.
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -73,15 +46,7 @@ const Register = () => {
       [name]: value
     }));
 
-    // When stream changes, reset course and reload courses list
-    if (name === 'streamId') {
-      setFormData(prev => ({ ...prev, courseId: '' }));
-      if (value) {
-        loadCourses(value).catch(() => {});
-      } else {
-        setCourses([]);
-      }
-    }
+    // No-op for streamId/courseId as fields are optional and hidden
     
     // Clear error when user starts typing
     if (errors[name]) {
@@ -141,16 +106,7 @@ const Register = () => {
       newErrors.role = 'Please select a role';
     }
 
-    // Faculty/Course validation for student or lecturer
-    const needsAcademic = formData.role === 'student' || formData.role === 'lecturer';
-    if (needsAcademic) {
-      if (!String(formData.streamId || '').trim()) {
-        newErrors.streamId = 'Please select your faculty';
-      }
-      if (!String(formData.courseId || '').trim()) {
-        newErrors.courseId = 'Please select your course';
-      }
-    }
+    // Faculty/Course no longer required for any role
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -162,16 +118,12 @@ const Register = () => {
     if (!validateForm()) {
       return;
     }
-
     setIsSubmitting(true);
 
     try {
-      const payload = {
-        ...formData,
-        // ensure numbers are sent for IDs if present
-        streamId: formData.streamId ? Number(formData.streamId) : undefined,
-        courseId: formData.courseId ? Number(formData.courseId) : undefined,
-      };
+      // Remove academic fields from submission
+      const { streamId, courseId, ...rest } = formData;
+      const payload = { ...rest };
       const result = await register(payload);
       
       if (result.success) {
@@ -254,10 +206,7 @@ const Register = () => {
         </Row>
 
         <Form.Group className="mb-3">
-          <Form.Label>
-            <i className="bi bi-person me-2"></i>
-            Username *
-          </Form.Label>
+          <Form.Label>Username *</Form.Label>
           <Form.Control
             type="text"
             name="username"
@@ -277,10 +226,7 @@ const Register = () => {
         </Form.Group>
 
         <Form.Group className="mb-3">
-          <Form.Label>
-            <i className="bi bi-envelope me-2"></i>
-            Email Address *
-          </Form.Label>
+          <Form.Label>Email Address *</Form.Label>
           <Form.Control
             type="email"
             name="email"
@@ -297,10 +243,7 @@ const Register = () => {
         </Form.Group>
 
         <Form.Group className="mb-3">
-          <Form.Label>
-            <i className="bi bi-telephone me-2"></i>
-            Phone Number (Optional)
-          </Form.Label>
+          <Form.Label>Phone Number (Optional)</Form.Label>
           <Form.Control
             type="tel"
             name="phone"
@@ -313,10 +256,7 @@ const Register = () => {
         </Form.Group>
 
         <Form.Group className="mb-3">
-          <Form.Label>
-            <i className="bi bi-person-badge me-2"></i>
-            Role *
-          </Form.Label>
+          <Form.Label>Role *</Form.Label>
           <Form.Select
             name="role"
             value={formData.role}
@@ -336,59 +276,12 @@ const Register = () => {
           </Form.Control.Feedback>
         </Form.Group>
 
-        {/* Faculty and Course selection for Student/Lecturer */}
-        {(formData.role === 'student' || formData.role === 'lecturer') && (
-          <Row>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Faculty *</Form.Label>
-                <Form.Select
-                  name="streamId"
-                  value={formData.streamId || ''}
-                  onChange={handleChange}
-                  isInvalid={!!errors.streamId}
-                  disabled={isSubmitting}
-                >
-                  <option value="">Select faculty</option>
-                  {streams.map(s => (
-                    <option key={s.id} value={s.id}>{s.stream_name}</option>
-                  ))}
-                </Form.Select>
-                <Form.Control.Feedback type="invalid">
-                  {errors.streamId}
-                </Form.Control.Feedback>
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Course *</Form.Label>
-                <Form.Select
-                  name="courseId"
-                  value={formData.courseId || ''}
-                  onChange={handleChange}
-                  isInvalid={!!errors.courseId}
-                  disabled={isSubmitting || !formData.streamId}
-                >
-                  <option value="">Select course</option>
-                  {courses.map(c => (
-                    <option key={c.id} value={c.id}>{c.course_name} ({c.course_code})</option>
-                  ))}
-                </Form.Select>
-                <Form.Control.Feedback type="invalid">
-                  {errors.courseId}
-                </Form.Control.Feedback>
-              </Form.Group>
-            </Col>
-          </Row>
-        )}
+        {/* Faculty and Course selection removed (optional fields no longer required) */}
 
         <Row>
           <Col md={6}>
             <Form.Group className="mb-3">
-              <Form.Label>
-                <i className="bi bi-lock me-2"></i>
-                Password *
-              </Form.Label>
+              <Form.Label>Password *</Form.Label>
               <InputGroup>
                 <Form.Control
                   type={showPassword ? 'text' : 'password'}
@@ -401,7 +294,7 @@ const Register = () => {
                   autoComplete="new-password"
                 />
                 <Button variant="outline-secondary" onClick={() => setShowPassword((s) => !s)} tabIndex={-1}>
-                  <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`}></i>
+                  {showPassword ? 'Hide' : 'Show'}
                 </Button>
               </InputGroup>
               <Form.Control.Feedback type="invalid">
@@ -411,10 +304,7 @@ const Register = () => {
           </Col>
           <Col md={6}>
             <Form.Group className="mb-4">
-              <Form.Label>
-                <i className="bi bi-lock-fill me-2"></i>
-                Confirm Password *
-              </Form.Label>
+              <Form.Label>Confirm Password *</Form.Label>
               <InputGroup>
                 <Form.Control
                   type={showConfirm ? 'text' : 'password'}
@@ -427,7 +317,7 @@ const Register = () => {
                   autoComplete="new-password"
                 />
                 <Button variant="outline-secondary" onClick={() => setShowConfirm((s) => !s)} tabIndex={-1}>
-                  <i className={`bi ${showConfirm ? 'bi-eye-slash' : 'bi-eye'}`}></i>
+                  {showConfirm ? 'Hide' : 'Show'}
                 </Button>
               </InputGroup>
               <Form.Control.Feedback type="invalid">
@@ -450,10 +340,7 @@ const Register = () => {
               Creating Account...
             </>
           ) : (
-            <>
-              <i className="bi bi-person-plus me-2"></i>
-              Create Account
-            </>
+            <>Create Account</>
           )}
         </Button>
       </Form>

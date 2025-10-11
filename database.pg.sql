@@ -112,6 +112,55 @@ BEGIN
   END IF;
 END$$;
 
+-- Ensure streams and courses tables and required columns exist for public endpoints
+-- Streams table baseline
+CREATE TABLE IF NOT EXISTS streams (
+  id SERIAL PRIMARY KEY,
+  stream_name TEXT NOT NULL
+);
+
+DO $$
+BEGIN
+  -- stream_code (optional, used by API)
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_name='streams' AND column_name='stream_code'
+  ) THEN
+    ALTER TABLE streams ADD COLUMN stream_code TEXT;
+  END IF;
+
+  -- description (optional, used by API)
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_name='streams' AND column_name='description'
+  ) THEN
+    ALTER TABLE streams ADD COLUMN description TEXT;
+  END IF;
+END$$;
+
+-- Courses table baseline
+CREATE TABLE IF NOT EXISTS courses (
+  id SERIAL PRIMARY KEY,
+  course_name TEXT NOT NULL,
+  course_code TEXT NOT NULL,
+  stream_id INT REFERENCES streams(id) ON DELETE SET NULL
+);
+
+DO $$
+BEGIN
+  -- credits (optional, used by API)
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_name='courses' AND column_name='credits'
+  ) THEN
+    ALTER TABLE courses ADD COLUMN credits INT;
+  END IF;
+
+  -- semester (optional, used by API)
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns WHERE table_name='courses' AND column_name='semester'
+  ) THEN
+    ALTER TABLE courses ADD COLUMN semester INT;
+  END IF;
+END$$;
+
 -- Optionally add foreign keys if tables exist
 DO $$
 DECLARE

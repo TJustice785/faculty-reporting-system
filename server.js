@@ -241,6 +241,18 @@ try {
   console.warn('⚠️  Swagger setup skipped:', e.message);
 }
 
+// Serve built client for non-API routes (Render API service can host SPA)
+const clientDist = path.join(__dirname, 'client', 'dist');
+try {
+  if (fs.existsSync(clientDist)) {
+    app.use(express.static(clientDist));
+    // SPA fallback: only for non-API paths
+    app.get(/^\/(?!api)(.*)/, (req, res) => {
+      res.sendFile(path.join(clientDist, 'index.html'));
+    });
+  }
+} catch (_) {}
+
 // Health check endpoint with database status
 app.get('/api/health', async (req, res) => {
   try {

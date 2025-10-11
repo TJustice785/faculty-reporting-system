@@ -162,6 +162,25 @@ router.post('/register', registerValidation, async (req, res) => {
          VALUES (?, 'system', 'Welcome to Faculty Reporting System', 'Your account was created successfully. Explore your dashboard, courses, and notifications to get started.')`,
         [newUserId]
       );
+
+      // Insert onboarding tips (non-fatal if fails)
+      await req.db.execute(
+        `INSERT INTO notifications (user_id, type, title, message)
+         VALUES (?, 'system', 'Tip: Complete your profile', 'Add your details and avatar in Profile to personalize your experience.')`,
+        [newUserId]
+      );
+      if (String(role) === 'student') {
+        await req.db.execute(
+          `INSERT INTO notifications (user_id, type, title, message)
+           VALUES (?, 'system', 'Tip: Create your first report', 'Use Create Report in the menu to draft and submit your first report.')`,
+          [newUserId]
+        );
+        await req.db.execute(
+          `INSERT INTO notifications (user_id, type, title, message)
+           VALUES (?, 'system', 'Tip: Rate your last class', 'Open My Classes and rate a lecturer for a course you are enrolled in.')`,
+          [newUserId]
+        );
+      }
     } catch (e) {
       // Non-fatal: do not block registration on notification failure
       console.warn('Welcome notification failed:', e.message);

@@ -143,6 +143,30 @@ router.post('/register', registerValidation, async (req, res) => {
     // Generate token
     const token = generateToken(newUserId, role);
 
+    // Create a welcome system notification for the new user (idempotent friendly)
+    try {
+      await req.db.execute(`
+        CREATE TABLE IF NOT EXISTS notifications (
+          id SERIAL PRIMARY KEY,
+          user_id INT NOT NULL,
+          type TEXT NOT NULL,
+          title TEXT,
+          message TEXT,
+          read BOOLEAN DEFAULT FALSE,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      // Insert welcome notification
+      await req.db.execute(
+        `INSERT INTO notifications (user_id, type, title, message)
+         VALUES (?, 'system', 'Welcome to Faculty Reporting System', 'Your account was created successfully. Explore your dashboard, courses, and notifications to get started.')`,
+        [newUserId]
+      );
+    } catch (e) {
+      // Non-fatal: do not block registration on notification failure
+      console.warn('Welcome notification failed:', e.message);
+    }
+
     // Return user data (without password)
     res.status(201).json({
       message: 'User registered successfully',

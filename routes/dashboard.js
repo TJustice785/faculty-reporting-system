@@ -172,6 +172,41 @@ router.get('/pending/count', verifyToken, async (req, res) => {
       return res.json({ count: 0 });
     }
 
+    // Get system notifications for this user
+    try {
+      await req.db.execute(`
+        CREATE TABLE IF NOT EXISTS notifications (
+          id SERIAL PRIMARY KEY,
+          user_id INT NOT NULL,
+          type TEXT NOT NULL,
+          title TEXT,
+          message TEXT,
+          read BOOLEAN DEFAULT FALSE,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+    } catch (_) {}
+    const [systemRows] = await req.db.execute(`
+      SELECT 
+        'system' as type,
+        n.id,
+        n.created_at,
+        COALESCE(n.title, 'System Update') as title,
+        n.message,
+        EXISTS (
+          SELECT 1 FROM notification_reads nr 
+          WHERE nr.user_id = ? AND nr.type = 'system' AND nr.source_id = n.id
+        ) AS read
+      FROM notifications n
+      WHERE n.user_id = ? AND n.type = 'system'
+      ORDER BY n.created_at DESC
+      LIMIT 10
+    `, [userId, userId]);
+    notifications = notifications.concat(systemRows.map(n => ({
+      ...n,
+      message: n.message || ''
+    })));
+
     const sql = `SELECT COUNT(*)::int AS count ${base}`;
     const [rows] = await req.db.execute(sql, params);
     const count = rows?.[0]?.count || 0;
@@ -271,6 +306,30 @@ router.get('/notifications/count', verifyToken, async (req, res) => {
         )
     `, [userId, userId]);
 
+    // Unread system notifications for this user
+    try {
+      await req.db.execute(`
+        CREATE TABLE IF NOT EXISTS notifications (
+          id SERIAL PRIMARY KEY,
+          user_id INT NOT NULL,
+          type TEXT NOT NULL,
+          title TEXT,
+          message TEXT,
+          read BOOLEAN DEFAULT FALSE,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+    } catch (_) {}
+    const [systemUnread] = await req.db.execute(`
+      SELECT COUNT(*)::int AS cnt
+      FROM notifications n
+      WHERE n.user_id = ? AND n.type = 'system'
+        AND NOT EXISTS (
+          SELECT 1 FROM notification_reads nr
+          WHERE nr.user_id = ? AND nr.type = 'system' AND nr.source_id = n.id
+        )
+    `, [userId, userId]);
+
     // Unread submitted reports relevant to this role
     let reportQuery = `
       SELECT COUNT(*)::int AS cnt
@@ -316,8 +375,8 @@ router.get('/notifications/count', verifyToken, async (req, res) => {
       newReportUnread = rows?.[0]?.cnt || 0;
     }
 
-    const unread = (feedbackUnread?.[0]?.cnt || 0) + newReportUnread;
-    res.json({ unread });
+    const unread = (feedbackUnread?.[0]?.cnt || 0) + newReportUnread + (systemUnread?.[0]?.cnt || 0);
+    res.json({ count: unread });
   } catch (error) {
     console.error('Notifications count error:', error);
     res.status(500).json({ error: 'Failed to fetch notifications count' });
@@ -349,7 +408,20 @@ router.post('/notifications/mark-all-read', verifyToken, async (req, res) => {
     // Build current notifications and insert missing reads
     const [feedback] = await req.db.execute(`SELECT 'feedback' as type, id FROM feedback WHERE feedback_to_id = ?`, [userId]);
     const [submitted] = await req.db.execute(`SELECT 'new_report' as type, id FROM reports WHERE status='submitted'`);
-    const all = [...(feedback||[]), ...(submitted||[])];
+    // Include system notifications for this user
+    await req.db.execute(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL,
+        type TEXT NOT NULL,
+        title TEXT,
+        message TEXT,
+        read BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    const [systemNotifs] = await req.db.execute(`SELECT 'system' as type, id FROM notifications WHERE user_id = ?`, [userId]);
+    const all = [...(feedback||[]), ...(submitted||[]), ...(systemNotifs||[])];
     for (const n of all) {
       await req.db.execute(`
         INSERT INTO notification_reads (user_id, type, source_id)

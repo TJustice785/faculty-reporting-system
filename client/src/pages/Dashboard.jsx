@@ -403,6 +403,27 @@ const Dashboard = () => {
         )}
       </Row>
 
+      {user?.role !== 'student' && (
+        <Row className="mb-4">
+          <Col md={4}>
+            <StatsCard
+              title="Peer Avg (Colleagues)"
+              value={personalData?.personalStats?.peer_avg_received != null ? String(personalData.personalStats.peer_avg_received) : 'N/A'}
+              color="secondary"
+              variant="default"
+            />
+          </Col>
+          <Col md={4}>
+            <StatsCard
+              title="Peer Ratings Count"
+              value={personalData?.personalStats?.peer_ratings_count || 0}
+              color="secondary"
+              variant="default"
+            />
+          </Col>
+        </Row>
+      )}
+
       {/* Trends mini chart for personal activity */}
       <Row className="mb-4">
         <Col md={12}>
@@ -426,6 +447,29 @@ const Dashboard = () => {
         <Col lg={8}>
           <RecentReports reports={personalData?.recentReports || []} />
           <QuickActions userRole={user?.role} />
+
+          {user?.role === 'student' && Array.isArray(personalData?.courseActivity) && personalData.courseActivity.length > 0 && (
+            <Card className="mt-3">
+              <Card.Header>
+                <h6 className="mb-0">Recent Course Activity</h6>
+              </Card.Header>
+              <Card.Body>
+                <div className="list-group list-group-flush">
+                  {personalData.courseActivity.map((it) => (
+                    <div key={it.id} className="list-group-item d-flex align-items-center justify-content-between">
+                      <div>
+                        <div className="fw-semibold">{it.title || 'Report'}</div>
+                        <small className="text-muted">
+                          {it.course_name || 'Course'} • {it.reporter_role || ''} • {new Date(it.created_at).toLocaleDateString()}
+                        </small>
+                      </div>
+                      <Link to={`/reports/${it.id}`} className="btn btn-sm btn-outline-secondary">Open</Link>
+                    </div>
+                  ))}
+                </div>
+              </Card.Body>
+            </Card>
+          )}
         </Col>
 
         {/* Right Column - Notifications & Pending Actions */}
@@ -503,6 +547,26 @@ const Dashboard = () => {
                       {course.student_count && ` • ${course.student_count} students`}
                       {course.avg_rating && ` • ${parseFloat(course.avg_rating).toFixed(1)} ⭐`}
                     </div>
+                  </div>
+                ))}
+              </Card.Body>
+            </Card>
+          )}
+
+          {/* Suggested Courses for students without enrollments */}
+          {user?.role === 'student' && Array.isArray(personalData?.suggestedCourses) && personalData.suggestedCourses.length > 0 && (
+            <Card className="mt-3">
+              <Card.Header>
+                <h6>Suggested Courses</h6>
+              </Card.Header>
+              <Card.Body>
+                {personalData.suggestedCourses.map((c, idx) => (
+                  <div key={idx} className="d-flex align-items-center justify-content-between mb-2 p-2 border rounded">
+                    <div>
+                      <div className="fw-semibold">{c.course_name}</div>
+                      <small className="text-muted">{c.course_code} • {c.stream_name} • {c.enrolled_students || 0} students</small>
+                    </div>
+                    <Button as={Link} to="/courses" size="sm" variant="outline-primary">View</Button>
                   </div>
                 ))}
               </Card.Body>

@@ -78,6 +78,10 @@ const dashboardRoutes = require('./routes/dashboard');
 const exportRoutes = require('./routes/export');
 const adminRoutes = require('./routes/admin');
 const notifications = require('./routes/notifications');
+const plRoutes = require('./routes/pl');
+let ratingsRoutes, progressRoutes;
+try { ratingsRoutes = require('./routes/ratings'); } catch (_) {}
+try { progressRoutes = require('./routes/progress'); } catch (_) {}
 
 const DB_CLIENT = 'postgres';
 const dbConfig = {
@@ -248,6 +252,9 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notifications.router);
+app.use('/api/pl', plRoutes);
+if (ratingsRoutes) app.use('/api/ratings', ratingsRoutes);
+if (progressRoutes) app.use('/api', progressRoutes);
 
 // Simple public test endpoint to verify routing without auth
 app.get('/api/users/public-test', (req, res) => {

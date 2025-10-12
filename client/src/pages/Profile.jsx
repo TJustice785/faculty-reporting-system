@@ -11,6 +11,15 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [error, setError] = useState('');
+  const [prefs, setPrefs] = useState({
+    email_enabled: true,
+    push_enabled: true,
+    system_enabled: true,
+    feedback_enabled: true,
+    new_report_enabled: true,
+  });
+  const [prefsLoading, setPrefsLoading] = useState(true);
+  const [prefsSaving, setPrefsSaving] = useState(false);
 
   useEffect(() => {
     const fetchMe = async () => {
@@ -34,7 +43,38 @@ export default function Profile() {
         setLoading(false);
       }
     };
+
+  const onPrefChange = (key) => (e) => setPrefs((p) => ({ ...p, [key]: e.target.checked }));
+  const onSavePrefs = async () => {
+    try {
+      setPrefsSaving(true);
+      await apiService.notifications.updatePreferences(prefs);
+      toast.success('Notification preferences saved');
+    } catch (e) {
+      toast.error(e?.response?.data?.error || 'Failed to save preferences');
+    } finally {
+      setPrefsSaving(false);
+    }
+  };
     fetchMe();
+    const fetchPrefs = async () => {
+      try {
+        setPrefsLoading(true);
+        const { data } = await apiService.notifications.getPreferences();
+        setPrefs({
+          email_enabled: !!data.email_enabled,
+          push_enabled: !!data.push_enabled,
+          system_enabled: !!data.system_enabled,
+          feedback_enabled: !!data.feedback_enabled,
+          new_report_enabled: !!data.new_report_enabled,
+        });
+      } catch (e) {
+        // safe default already set
+      } finally {
+        setPrefsLoading(false);
+      }
+    };
+    fetchPrefs();
   }, []);
 
   const onChange = (key, val) => setProfile((p) => ({ ...p, [key]: val }));
@@ -191,6 +231,44 @@ export default function Profile() {
                   </Button>
                 </div>
               </Form>
+            </Card.Body>
+          </Card>
+
+          <Card className="mt-3">
+            <Card.Header>
+              <strong>Notification Preferences</strong>
+            </Card.Header>
+            <Card.Body>
+              {prefsLoading ? (
+                <Spinner size="sm" />
+              ) : (
+                <Form>
+                  <Row className="mb-2">
+                    <Col md={6}>
+                      <Form.Check type="switch" id="pref-email" label="Email notifications" checked={prefs.email_enabled} onChange={onPrefChange('email_enabled')} disabled={prefsSaving} />
+                    </Col>
+                    <Col md={6}>
+                      <Form.Check type="switch" id="pref-push" label="Push/browser notifications" checked={prefs.push_enabled} onChange={onPrefChange('push_enabled')} disabled={prefsSaving} />
+                    </Col>
+                  </Row>
+                  <Row className="mb-2">
+                    <Col md={4}>
+                      <Form.Check type="switch" id="pref-system" label="System" checked={prefs.system_enabled} onChange={onPrefChange('system_enabled')} disabled={prefsSaving} />
+                    </Col>
+                    <Col md={4}>
+                      <Form.Check type="switch" id="pref-feedback" label="Feedback" checked={prefs.feedback_enabled} onChange={onPrefChange('feedback_enabled')} disabled={prefsSaving} />
+                    </Col>
+                    <Col md={4}>
+                      <Form.Check type="switch" id="pref-newreport" label="New Reports" checked={prefs.new_report_enabled} onChange={onPrefChange('new_report_enabled')} disabled={prefsSaving} />
+                    </Col>
+                  </Row>
+                  <div className="mt-2">
+                    <Button variant="primary" size="sm" onClick={onSavePrefs} disabled={prefsSaving}>
+                      {prefsSaving ? 'Saving...' : 'Save Preferences'}
+                    </Button>
+                  </div>
+                </Form>
+              )}
             </Card.Body>
           </Card>
         </Col>

@@ -14,6 +14,32 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+
+  // Notification endpoints
+  notifications: {
+    getPreferences: () => api.get('/notifications/preferences'),
+    updatePreferences: (prefs) => api.put('/notifications/preferences', prefs),
+  },
+
+  // PL/PRL endpoints
+  pl: {
+    getStreams: () => api.get('/pl/streams'),
+    getStreamCourses: (streamId) => api.get(`/pl/streams/${streamId}/courses`),
+    getStreamReports: (streamId, params) => api.get(`/pl/streams/${streamId}/reports`, { params }),
+  },
+
+  // Ratings endpoints (peer)
+  ratings: {
+    getPeerReceived: (lecturerId) => api.get('/ratings/peer/received', { params: { lecturerId } }),
+    getPeerGiven: (lecturerId) => api.get('/ratings/peer/given', { params: { lecturerId } }),
+    addPeer: (payload) => api.post('/ratings/peer', payload),
+  },
+
+  // Progress endpoints
+  progress: {
+    getMy: () => api.get('/users/me/progress'),
+    updateMy: (courseId, completion) => api.put('/users/me/progress', { courseId, completion }),
+  },
 });
 
 // Request interceptor to add auth token

@@ -283,6 +283,33 @@ router.get('/notifications/count', verifyToken, async (req, res) => {
     const userId = req.user.id;
     const userRole = req.user.role;
 
+    // Load notification preferences (defaults: all enabled)
+    let prefs = {
+      system_enabled: true,
+      feedback_enabled: true,
+      new_report_enabled: true,
+    };
+    try {
+      await req.db.execute(`
+        CREATE TABLE IF NOT EXISTS notification_preferences (
+          id SERIAL PRIMARY KEY,
+          user_id INT NOT NULL UNIQUE,
+          email_enabled BOOLEAN DEFAULT TRUE,
+          push_enabled BOOLEAN DEFAULT TRUE,
+          system_enabled BOOLEAN DEFAULT TRUE,
+          feedback_enabled BOOLEAN DEFAULT TRUE,
+          new_report_enabled BOOLEAN DEFAULT TRUE
+        )
+      `);
+      const [pr] = await req.db.execute(
+        `SELECT system_enabled, feedback_enabled, new_report_enabled FROM notification_preferences WHERE user_id = ?`,
+        [userId]
+      );
+      if (pr && pr[0]) {
+        prefs = { ...prefs, ...pr[0] };
+      }
+    } catch (_) { /* ignore */ }
+
     // Ensure notification_reads exists
     await req.db.execute(`
       CREATE TABLE IF NOT EXISTS notification_reads (
@@ -375,7 +402,11 @@ router.get('/notifications/count', verifyToken, async (req, res) => {
       newReportUnread = rows?.[0]?.cnt || 0;
     }
 
-    const unread = (feedbackUnread?.[0]?.cnt || 0) + newReportUnread + (systemUnread?.[0]?.cnt || 0);
+    // Apply preferences: zero out disabled categories
+    const feedbackCnt = prefs.feedback_enabled ? (feedbackUnread?.[0]?.cnt || 0) : 0;
+    const systemCnt = prefs.system_enabled ? (systemUnread?.[0]?.cnt || 0) : 0;
+    const newReportCnt = prefs.new_report_enabled ? newReportUnread : 0;
+    const unread = feedbackCnt + newReportCnt + systemCnt;
     res.json({ count: unread });
   } catch (error) {
     console.error('Notifications count error:', error);

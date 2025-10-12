@@ -25,20 +25,50 @@ export default function StudentRating() {
       try {
         setLoading(true);
         const { data } = await apiService.dashboard.getPersonal();
+        const myRole = data?.user?.role;
         let list = data?.courses || [];
+        // 1) Try available courses for the user
         if (!Array.isArray(list) || list.length === 0) {
           try {
             const alt = await apiService.users.getAvailableCourses();
             list = Array.isArray(alt.data?.courses) ? alt.data.courses : (Array.isArray(alt.data) ? alt.data : []);
           } catch (_) { /* ignore */ }
         }
+        // 2) If PL/PRL, gather courses from managed streams
+        if ((!Array.isArray(list) || list.length === 0) && ['program_leader','principal_lecturer'].includes(myRole)) {
+          try {
+            const streamsRes = await apiService.pl.getStreams();
+            const streams = streamsRes?.data?.streams || [];
+            const cMap = new Map();
+            for (const s of streams) {
+              try {
+                const cr = await apiService.pl.getStreamCourses(s.id);
+                const scourses = cr?.data?.courses || [];
+                for (const c of scourses) { if (c?.id) cMap.set(c.id, c); }
+              } catch (_) {}
+            }
+            list = Array.from(cMap.values());
+          } catch (_) {}
+        }
+        // 3) Public courses fallback (FM/Admin or anyone)
+        if (!Array.isArray(list) || list.length === 0) {
+          try {
+            const pub = await apiService.users.getPublicCourses({ limit: 100 });
+            list = Array.isArray(pub.data?.items) ? pub.data.items : (Array.isArray(pub.data) ? pub.data : []);
+          } catch (_) {}
+        }
         // Normalize course shape to { id, course_name, course_code }
         const normalized = (list || []).map(c => ({
           id: c.id ?? c.course_id ?? c.courseId,
           course_name: c.course_name ?? c.name ?? c.title ?? 'Untitled',
           course_code: c.course_code ?? c.code ?? '',
+          my_rating: c.my_rating ?? c.myRating,
         })).filter(c => c.id != null);
         setCourses(normalized);
+        // Preselect first course if none selected
+        if (!form.courseId && normalized.length > 0) {
+          setForm((f) => ({ ...f, courseId: String(normalized[0].id) }));
+        }
       } catch (err) {
         setError(err?.response?.data?.error || 'Failed to load courses');
       } finally {

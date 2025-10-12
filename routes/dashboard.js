@@ -173,6 +173,7 @@ router.get('/pending/count', verifyToken, async (req, res) => {
     }
 
     // Get system notifications for this user
+    let notifications = [];
     try {
       await req.db.execute(`
         CREATE TABLE IF NOT EXISTS notifications (

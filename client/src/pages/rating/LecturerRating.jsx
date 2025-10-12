@@ -1,12 +1,18 @@
-import React, { useEffect, useState } from 'react';
-import { Card, Row, Col, Spinner, Alert, Table, Badge } from 'react-bootstrap';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Card, Row, Col, Spinner, Alert, Table, Badge, Form, Button } from 'react-bootstrap';
 import { apiService } from '../../services/api';
+import toast from 'react-hot-toast';
 
 export default function LecturerRating() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [stats, setStats] = useState({});
   const [courses, setCourses] = useState([]);
+  const [peerReceived, setPeerReceived] = useState([]);
+  const [peerGiven, setPeerGiven] = useState([]);
+  const [colleagues, setColleagues] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({ ratedLecturerId: '', rating: 5, comment: '' });
 
   useEffect(() => {
     const load = async () => {
@@ -14,7 +20,31 @@ export default function LecturerRating() {
         setLoading(true);
         const { data } = await apiService.dashboard.getPersonal();
         setStats(data?.personalStats || {});
-        setCourses(data?.courses || []);
+        const crs = data?.courses || [];
+        setCourses(crs);
+        // Load peer ratings received/given
+        const [rec, giv] = await Promise.all([
+          apiService.ratings.getPeerReceived(),
+          apiService.ratings.getPeerGiven(),
+        ]);
+        setPeerReceived(rec?.data?.ratings || []);
+        setPeerGiven(giv?.data?.ratings || []);
+        // Build colleagues list based on courses taught by the user
+        const lecturerMap = new Map();
+        for (const c of crs) {
+          try {
+            const { data: lecRes } = await apiService.users.getLecturersByCourse(c.id);
+            const list = Array.isArray(lecRes?.lecturers) ? lecRes.lecturers : (Array.isArray(lecRes) ? lecRes : []);
+            for (const l of list) {
+              if (!l?.id) continue;
+              lecturerMap.set(l.id, l);
+            }
+          } catch (_) {}
+        }
+        const meId = data?.user?.id;
+        const options = Array.from(lecturerMap.values()).filter(l => l.id !== meId);
+        setColleagues(options);
+        if (options.length > 0) setForm((f) => ({ ...f, ratedLecturerId: String(options[0].id) }));
       } catch (err) {
         setError(err?.response?.data?.error || 'Failed to load rating data');
       } finally {
@@ -23,6 +53,30 @@ export default function LecturerRating() {
     };
     load();
   }, []);
+
+  const onFormChange = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+  const onSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      setSubmitting(true);
+      const ratedLecturerId = parseInt(form.ratedLecturerId, 10);
+      const rating = Number(form.rating);
+      await apiService.ratings.addPeer({ ratedLecturerId, rating, comment: form.comment });
+      toast.success('Peer rating submitted');
+      // Refresh lists
+      const [rec, giv] = await Promise.all([
+        apiService.ratings.getPeerReceived(),
+        apiService.ratings.getPeerGiven(),
+      ]);
+      setPeerReceived(rec?.data?.ratings || []);
+      setPeerGiven(giv?.data?.ratings || []);
+      setForm((f) => ({ ...f, comment: '' }));
+    } catch (e) {
+      toast.error(e?.response?.data?.error || 'Failed to submit rating');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (loading) return <div className="container py-4"><Spinner /></div>;
   if (error) return <div className="container py-4"><Alert variant="danger">{error}</Alert></div>;
@@ -81,6 +135,110 @@ export default function LecturerRating() {
           </Card>
         </Col>
       </Row>
+
+      <Row>
+        <Col md={6} className="mb-3">
+          <Card>
+            <Card.Header><strong>Peer Ratings - Received</strong></Card.Header>
+            <Card.Body>
+              {peerReceived.length === 0 ? (
+                <div className="text-muted">No peer ratings yet</div>
+              ) : (
+                <Table responsive hover size="sm" className="mb-0">
+                  <thead className="table-light">
+                    <tr>
+                      <th>From</th>
+                      <th>Rating</th>
+                      <th>Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {peerReceived.map((r) => (
+                      <tr key={r.id}>
+                        <td>{r.rater_first_name} {r.rater_last_name}</td>
+                        <td>{Number(r.rating).toFixed(1)} / 5</td>
+                        <td>{new Date(r.created_at).toLocaleDateString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              )}
+            </Card.Body>
+          </Card>
+        </Col>
+        <Col md={6} className="mb-3">
+          <Card>
+            <Card.Header><strong>Peer Ratings - Given</strong></Card.Header>
+            <Card.Body>
+              {peerGiven.length === 0 ? (
+                <div className="text-muted">No peer ratings given</div>
+              ) : (
+                <Table responsive hover size="sm" className="mb-0">
+                  <thead className="table-light">
+                    <tr>
+                      <th>To</th>
+                      <th>Rating</th>
+                      <th>Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {peerGiven.map((r) => (
+                      <tr key={r.id}>
+                        <td>{r.rated_first_name} {r.rated_last_name}</td>
+                        <td>{Number(r.rating).toFixed(1)} / 5</td>
+                        <td>{new Date(r.created_at).toLocaleDateString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              )}
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+
+      <Card>
+        <Card.Header><strong>Rate a Colleague</strong></Card.Header>
+        <Card.Body>
+          {colleagues.length === 0 ? (
+            <div className="text-muted">No colleagues found for your courses.</div>
+          ) : (
+            <Form onSubmit={onSubmit} className="d-flex flex-column gap-3">
+              <Row>
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>Lecturer</Form.Label>
+                    <Form.Select value={form.ratedLecturerId} onChange={onFormChange('ratedLecturerId')} disabled={submitting}>
+                      {colleagues.map((l) => (
+                        <option key={l.id} value={l.id}>{l.first_name} {l.last_name}</option>
+                      ))}
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>Rating</Form.Label>
+                    <Form.Select value={form.rating} onChange={onFormChange('rating')} disabled={submitting}>
+                      {[5,4.5,4,3.5,3,2.5,2,1.5,1].map((v) => (
+                        <option key={v} value={v}>{v}</option>
+                      ))}
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+              </Row>
+              <Form.Group>
+                <Form.Label>Comment (optional)</Form.Label>
+                <Form.Control as="textarea" rows={3} value={form.comment} onChange={onFormChange('comment')} disabled={submitting} />
+              </Form.Group>
+              <div>
+                <Button type="submit" variant="primary" disabled={submitting}>
+                  {submitting ? 'Submitting...' : 'Submit Rating'}
+                </Button>
+              </div>
+            </Form>
+          )}
+        </Card.Body>
+      </Card>
     </div>
   );
 }

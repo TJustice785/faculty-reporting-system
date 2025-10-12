@@ -20,7 +20,33 @@ export default function LecturerRating() {
         setLoading(true);
         const { data } = await apiService.dashboard.getPersonal();
         setStats(data?.personalStats || {});
-        const crs = data?.courses || [];
+        let crs = data?.courses || [];
+        // If courses are empty, populate based on role scope
+        const myRole = data?.user?.role;
+        if ((!Array.isArray(crs) || crs.length === 0) && ['program_leader','principal_lecturer'].includes(myRole)) {
+          try {
+            const streamsRes = await apiService.pl.getStreams();
+            const streams = streamsRes?.data?.streams || [];
+            const courseMap = new Map();
+            for (const s of streams) {
+              try {
+                const coursesRes = await apiService.pl.getStreamCourses(s.id);
+                const scourses = coursesRes?.data?.courses || [];
+                for (const sc of scourses) {
+                  if (!sc?.id) continue;
+                  courseMap.set(sc.id, sc);
+                }
+              } catch (_) {}
+            }
+            crs = Array.from(courseMap.values());
+          } catch (_) {}
+        } else if ((!Array.isArray(crs) || crs.length === 0) && (myRole === 'faculty_manager' || myRole === 'admin')) {
+          try {
+            const { data: pc } = await apiService.users.getPublicCourses({ limit: 50 });
+            const list = Array.isArray(pc?.items) ? pc.items : (Array.isArray(pc) ? pc : []);
+            crs = list;
+          } catch (_) {}
+        }
         setCourses(crs);
         // Load peer ratings received/given
         const [rec, giv] = await Promise.all([

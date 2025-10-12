@@ -29,19 +29,61 @@ export default function LecturerRating() {
         ]);
         setPeerReceived(rec?.data?.ratings || []);
         setPeerGiven(giv?.data?.ratings || []);
-        // Build colleagues list based on courses taught by the user
+        // Build colleagues list
+        const meId = data?.user?.id;
+        const myRole = data?.user?.role;
         const lecturerMap = new Map();
-        for (const c of crs) {
+
+        // 1) If user teaches courses, include co-lecturers on those courses
+        if (Array.isArray(crs) && crs.length > 0) {
+          for (const c of crs) {
+            try {
+              const { data: lecRes } = await apiService.users.getLecturersByCourse(c.id);
+              const list = Array.isArray(lecRes?.lecturers) ? lecRes.lecturers : (Array.isArray(lecRes) ? lecRes : []);
+              for (const l of list) {
+                if (!l?.id) continue;
+                lecturerMap.set(l.id, l);
+              }
+            } catch (_) {}
+          }
+        }
+
+        // 2) If PL/PRL, include lecturers from managed streams
+        if (['program_leader','principal_lecturer'].includes(myRole)) {
           try {
-            const { data: lecRes } = await apiService.users.getLecturersByCourse(c.id);
-            const list = Array.isArray(lecRes?.lecturers) ? lecRes.lecturers : (Array.isArray(lecRes) ? lecRes : []);
+            const streamsRes = await apiService.pl.getStreams();
+            const streams = streamsRes?.data?.streams || [];
+            for (const s of streams) {
+              try {
+                const coursesRes = await apiService.pl.getStreamCourses(s.id);
+                const scourses = coursesRes?.data?.courses || [];
+                for (const sc of scourses) {
+                  try {
+                    const { data: lecRes } = await apiService.users.getLecturersByCourse(sc.id);
+                    const list = Array.isArray(lecRes?.lecturers) ? lecRes.lecturers : (Array.isArray(lecRes) ? lecRes : []);
+                    for (const l of list) {
+                      if (!l?.id) continue;
+                      lecturerMap.set(l.id, l);
+                    }
+                  } catch (_) {}
+                }
+              } catch (_) {}
+            }
+          } catch (_) {}
+        }
+
+        // 3) If FM/Admin and still empty, try fetching all lecturers (best effort)
+        if ((myRole === 'faculty_manager' || myRole === 'admin') && lecturerMap.size === 0) {
+          try {
+            const { data: usersRes } = await apiService.users.getAll({ role: 'lecturer', limit: 100 });
+            const list = Array.isArray(usersRes?.items) ? usersRes.items : (Array.isArray(usersRes) ? usersRes : []);
             for (const l of list) {
               if (!l?.id) continue;
               lecturerMap.set(l.id, l);
             }
           } catch (_) {}
         }
-        const meId = data?.user?.id;
+
         const options = Array.from(lecturerMap.values()).filter(l => l.id !== meId);
         setColleagues(options);
         if (options.length > 0) setForm((f) => ({ ...f, ratedLecturerId: String(options[0].id) }));

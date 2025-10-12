@@ -57,7 +57,6 @@ export default function LecturerRating() {
         setPeerGiven(giv?.data?.ratings || []);
         // Build colleagues list
         const meId = data?.user?.id;
-        const myRole = data?.user?.role;
         const lecturerMap = new Map();
 
         // 1) If user teaches courses, include co-lecturers on those courses
